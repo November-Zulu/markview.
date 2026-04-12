@@ -22,6 +22,9 @@ build/
 # macOS custom icon
 Icon?
 
+# Claude Code
+CLAUDE.md
+
 # Design source files
 icon-project/
 
