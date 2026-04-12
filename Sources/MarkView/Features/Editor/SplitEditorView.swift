@@ -27,10 +27,24 @@ struct SplitEditorView: View {
                                 }
                         )
 
-                    PreviewPaneView(workspace: workspace)
-                        .frame(maxHeight: .infinity)
+                    VStack(spacing: 0) {
+                        PreviewHeaderBar(workspace: workspace)
+                        Divider()
+                        previewContent
+                            .frame(maxHeight: .infinity)
+                    }
                 }
             }
+        }
+    }
+
+    @ViewBuilder
+    private var previewContent: some View {
+        let preview = PreviewPaneView(workspace: workspace)
+        if workspace.activeSession.isPreviewLightModeEnabled {
+            preview.environment(\.colorScheme, .light)
+        } else {
+            preview
         }
     }
 }

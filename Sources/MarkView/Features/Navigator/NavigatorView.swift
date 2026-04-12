@@ -15,13 +15,12 @@ struct NavigatorView: View {
                 NavigatorEmptyState(project: project)
             }
         }
-        .background(DesignTokens.sidebarBackground)
+        .background(DesignTokens.paneBackground)
         .overlay(alignment: .bottom) {
             if let message = project.loadErrorMessage {
                 errorBanner(message)
             }
         }
-        .navigationTitle(project.rootURL?.lastPathComponent ?? "Project")
         .navigationSplitViewColumnWidth(min: 220, ideal: 280, max: 440)
     }
 
@@ -52,10 +51,20 @@ struct NavigatorView: View {
 
     @ViewBuilder
     private func row(for node: FileNode) -> some View {
+        let selected = node.url == project.selection
         if node.isMarkdown {
-            FileTreeRow(node: node).tag(node.url)
+            FileTreeRow(node: node)
+                .tag(node.url)
+                .listRowBackground(
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(selected ? Color.accentColor.opacity(0.2) : .clear)
+                )
         } else {
             FileTreeRow(node: node)
+                .listRowBackground(
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(selected ? Color.accentColor.opacity(0.2) : .clear)
+                )
         }
     }
 

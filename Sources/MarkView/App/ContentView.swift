@@ -6,12 +6,18 @@ struct ContentView: View {
     @Bindable var project: ProjectState
 
     var body: some View {
-        NavigationSplitView(columnVisibility: $workspace.columnVisibility) {
-            NavigatorView(project: project, workspace: workspace)
-        } detail: {
-            SplitEditorView(workspace: workspace)
+        VStack(spacing: 0) {
+            NavigationSplitView(columnVisibility: $workspace.columnVisibility) {
+                NavigatorView(project: project, workspace: workspace)
+            } detail: {
+                SplitEditorView(workspace: workspace)
+            }
+            .navigationSplitViewStyle(.balanced)
+            .navigationTitle("markview.")
+
+            Divider()
+            StatusBarView(content: workspace.activeDocument?.content)
         }
-        .navigationSplitViewStyle(.balanced)
         .frame(minWidth: 900, minHeight: 560)
         .task {
             NSApp.setActivationPolicy(.regular)
@@ -65,8 +71,9 @@ struct ContentView: View {
     private var closeConfirmationBinding: Binding<Bool> {
         Binding(
             get: { workspace.closeConfirmation != nil },
-            set: { newValue in
-                if !newValue { workspace.closeConfirmation = nil }
+            set: { _ in
+                // No-op: button actions (save/discard/cancel) handle clearing closeConfirmation.
+                // Setting nil here would race with the async save Task.
             }
         )
     }

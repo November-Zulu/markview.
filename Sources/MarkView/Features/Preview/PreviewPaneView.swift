@@ -5,14 +5,16 @@ struct PreviewPaneView: View {
     @Bindable var workspace: WorkspaceState
     @State private var parsed: Document?
 
+    private var isScrollLocked: Bool {
+        workspace.activeSession.isScrollLockEnabled
+    }
+
     var body: some View {
         Group {
             if workspace.activeDocument == nil {
                 PreviewEmptyState()
             } else if let parsed {
-                ScrollView(.vertical) {
-                    MarkdownRenderer(document: parsed)
-                }
+                previewScrollView(for: parsed)
             } else {
                 Color.clear
             }
@@ -34,6 +36,22 @@ struct PreviewPaneView: View {
             let result = await MarkdownParser.parse(doc.content)
             guard !Task.isCancelled else { return }
             parsed = result
+        }
+    }
+
+    @ViewBuilder
+    private func previewScrollView(for document: Document) -> some View {
+        ScrollViewReader { proxy in
+            ScrollView(.vertical) {
+                MarkdownRenderer(document: document)
+                    .id("preview-content")
+            }
+            .onChange(of: workspace.editorScrollFraction) { _, fraction in
+                guard isScrollLocked else { return }
+                withAnimation(.easeOut(duration: 0.05)) {
+                    proxy.scrollTo("preview-content", anchor: UnitPoint(x: 0.5, y: fraction))
+                }
+            }
         }
     }
 }

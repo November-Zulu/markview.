@@ -66,17 +66,18 @@ private struct HighlightWalker: MarkupWalker {
 
     mutating func visitHeading(_ heading: Heading) -> () {
         if let range = nsRange(for: heading) {
-            let sizes: [Int: CGFloat] = [1: 20, 2: 17, 3: 15, 4: 14, 5: 13, 6: 12]
-            let size = sizes[heading.level] ?? 13
+            let color: NSColor = switch heading.level {
+            case 1: DesignTokens.SyntaxColors.heading1
+            case 2: DesignTokens.SyntaxColors.heading2
+            case 3: DesignTokens.SyntaxColors.heading3
+            default: DesignTokens.SyntaxColors.headingOther
+            }
             highlights.append(.init(
                 range: range,
-                attributes: [
-                    .font: NSFont.monospacedSystemFont(ofSize: size, weight: .bold),
-                    .foregroundColor: NSColor.systemBlue,
-                ]
+                attributes: [.foregroundColor: color]
             ))
         }
-        descendInto(heading)
+        // No descendInto — heading gets uniform color across the full line
     }
 
     // MARK: - Inline emphasis
@@ -85,24 +86,19 @@ private struct HighlightWalker: MarkupWalker {
         if let range = nsRange(for: strong) {
             highlights.append(.init(
                 range: range,
-                attributes: [
-                    .font: NSFont.monospacedSystemFont(ofSize: 13, weight: .bold),
-                ]
+                attributes: [.foregroundColor: DesignTokens.SyntaxColors.strong]
             ))
         }
-        descendInto(strong)
+        // No descendInto — avoids child highlights overriding/overflowing
     }
 
     mutating func visitEmphasis(_ emphasis: Emphasis) -> () {
         if let range = nsRange(for: emphasis) {
-            let baseFont = NSFont.monospacedSystemFont(ofSize: 13, weight: .regular)
-            let italicFont = NSFontManager.shared.convert(baseFont, toHaveTrait: .italicFontMask)
             highlights.append(.init(
                 range: range,
-                attributes: [.font: italicFont]
+                attributes: [.foregroundColor: DesignTokens.SyntaxColors.emphasis]
             ))
         }
-        descendInto(emphasis)
     }
 
     // MARK: - Code
@@ -111,10 +107,7 @@ private struct HighlightWalker: MarkupWalker {
         if let range = nsRange(for: inlineCode) {
             highlights.append(.init(
                 range: range,
-                attributes: [
-                    .foregroundColor: NSColor.systemOrange,
-                    .font: NSFont.monospacedSystemFont(ofSize: 13, weight: .medium),
-                ]
+                attributes: [.foregroundColor: DesignTokens.SyntaxColors.inlineCode]
             ))
         }
     }
@@ -123,10 +116,7 @@ private struct HighlightWalker: MarkupWalker {
         if let range = nsRange(for: codeBlock) {
             highlights.append(.init(
                 range: range,
-                attributes: [
-                    .foregroundColor: NSColor.secondaryLabelColor,
-                    .font: NSFont.monospacedSystemFont(ofSize: 13, weight: .regular),
-                ]
+                attributes: [.foregroundColor: DesignTokens.SyntaxColors.codeBlock]
             ))
         }
     }
@@ -138,12 +128,11 @@ private struct HighlightWalker: MarkupWalker {
             highlights.append(.init(
                 range: range,
                 attributes: [
-                    .foregroundColor: NSColor.linkColor,
+                    .foregroundColor: DesignTokens.SyntaxColors.link,
                     .underlineStyle: NSUnderlineStyle.single.rawValue,
                 ]
             ))
         }
-        descendInto(link)
     }
 
     // MARK: - Block quotes
@@ -153,7 +142,7 @@ private struct HighlightWalker: MarkupWalker {
             highlights.append(.init(
                 range: range,
                 attributes: [
-                    .foregroundColor: NSColor.tertiaryLabelColor,
+                    .foregroundColor: DesignTokens.SyntaxColors.blockQuote,
                 ]
             ))
         }
@@ -163,16 +152,8 @@ private struct HighlightWalker: MarkupWalker {
     // MARK: - Lists
 
     mutating func visitListItem(_ listItem: ListItem) -> () {
-        // Highlight just the marker area (first 2 chars) if available
-        if let range = nsRange(for: listItem), range.length >= 2 {
-            let markerRange = NSRange(location: range.location, length: min(2, range.length))
-            highlights.append(.init(
-                range: markerRange,
-                attributes: [
-                    .foregroundColor: NSColor.systemTeal,
-                ]
-            ))
-        }
+        // Don't highlight list markers — the AST range covers content only, not the
+        // marker character, so coloring the first N chars would color content text.
         descendInto(listItem)
     }
 }

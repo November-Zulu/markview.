@@ -13,6 +13,10 @@ final class WorkspaceState {
     /// Per-file session state (split ratio, toggles). Session-only, not persisted.
     var fileSessions: [URL: FileSessionState] = [:]
 
+    /// Editor scroll position as a fraction (0.0 = top, 1.0 = bottom).
+    /// Used for scroll lock synchronization with the preview pane.
+    var editorScrollFraction: CGFloat = 0
+
     /// Non-nil while a "save changes before closing" prompt is pending for a tab close.
     var closeConfirmation: OpenDocument?
 

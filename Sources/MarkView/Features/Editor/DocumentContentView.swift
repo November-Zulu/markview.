@@ -4,6 +4,7 @@ import SwiftUI
 /// an error state, and the `MarkdownTextView` once contents are ready.
 struct DocumentContentView: View {
     @Bindable var document: OpenDocument
+    @Binding var scrollFraction: CGFloat
     var syntaxHighlightingEnabled: Bool = true
     var editorLightModeEnabled: Bool = false
 
@@ -26,6 +27,7 @@ struct DocumentContentView: View {
             } else {
                 MarkdownTextView(
                     text: $document.content,
+                    scrollFraction: $scrollFraction,
                     syntaxHighlightingEnabled: syntaxHighlightingEnabled,
                     editorLightModeEnabled: editorLightModeEnabled
                 )

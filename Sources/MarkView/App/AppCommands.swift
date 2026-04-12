@@ -34,12 +34,12 @@ struct AppCommands: Commands {
         }
 
         CommandGroup(replacing: .sidebar) {
-            Button(workspace.columnVisibility == .all ? "Hide Navigator" : "Show Navigator") {
+            Button(workspace.columnVisibility == .all ? "Hide Navigation Pane" : "Show Navigation Pane") {
                 workspace.toggleNavigator()
             }
             .keyboardShortcut("s", modifiers: [.command, .option])
 
-            Button(workspace.isPreviewVisible ? "Hide Preview" : "Show Preview") {
+            Button(workspace.isPreviewVisible ? "Hide Preview Pane" : "Show Preview Pane") {
                 workspace.togglePreview()
             }
             .keyboardShortcut("p", modifiers: [.command, .option])

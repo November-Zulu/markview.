@@ -17,6 +17,7 @@ struct EditorPaneView: View {
                 if let active = workspace.activeDocument {
                     DocumentContentView(
                         document: active,
+                        scrollFraction: $workspace.editorScrollFraction,
                         syntaxHighlightingEnabled: session.isSyntaxHighlightingEnabled,
                         editorLightModeEnabled: session.isEditorLightModeEnabled
                     )

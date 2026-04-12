@@ -5,6 +5,7 @@ import AppKit
 /// monospaced font, line wrapping, undo/redo, no smart substitutions.
 struct MarkdownTextView: NSViewRepresentable {
     @Binding var text: String
+    @Binding var scrollFraction: CGFloat
     var syntaxHighlightingEnabled: Bool = true
     var editorLightModeEnabled: Bool = false
 
@@ -33,6 +34,15 @@ struct MarkdownTextView: NSViewRepresentable {
             context.coordinator.scheduleHighlight()
         }
 
+        // Observe scroll position changes
+        scrollView.contentView.postsBoundsChangedNotifications = true
+        NotificationCenter.default.addObserver(
+            context.coordinator,
+            selector: #selector(Coordinator.scrollViewDidScroll(_:)),
+            name: NSView.boundsDidChangeNotification,
+            object: scrollView.contentView
+        )
+
         return scrollView
     }
 
@@ -47,17 +57,19 @@ struct MarkdownTextView: NSViewRepresentable {
         coordinator.lastSyntaxHighlightingEnabled = syntaxHighlightingEnabled
         coordinator.lastEditorLightModeEnabled = editorLightModeEnabled
 
+        var textChanged = false
         if textView.string != text {
             let selectedRanges = textView.selectedRanges
             textView.string = text
             textView.selectedRanges = selectedRanges
+            textChanged = true
         }
 
         if appearanceChanged {
             applyAppearance(textView)
         }
 
-        if highlightingChanged {
+        if highlightingChanged || (textChanged && syntaxHighlightingEnabled) {
             if syntaxHighlightingEnabled {
                 coordinator.scheduleHighlight()
             } else {
@@ -67,7 +79,7 @@ struct MarkdownTextView: NSViewRepresentable {
     }
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(text: $text, syntaxHighlightingEnabled: syntaxHighlightingEnabled)
+        Coordinator(text: $text, scrollFraction: $scrollFraction, syntaxHighlightingEnabled: syntaxHighlightingEnabled)
     }
 
     // MARK: - Configuration
@@ -135,15 +147,30 @@ struct MarkdownTextView: NSViewRepresentable {
     @MainActor
     final class Coordinator: NSObject, NSTextViewDelegate {
         var text: Binding<String>
+        var scrollFraction: Binding<CGFloat>
         weak var textView: NSTextView?
         var isApplyingUserEdit = false
         var lastSyntaxHighlightingEnabled: Bool
         var lastEditorLightModeEnabled: Bool = false
         private var highlightTask: Task<Void, Never>?
 
-        init(text: Binding<String>, syntaxHighlightingEnabled: Bool) {
+        init(text: Binding<String>, scrollFraction: Binding<CGFloat>, syntaxHighlightingEnabled: Bool) {
             self.text = text
+            self.scrollFraction = scrollFraction
             self.lastSyntaxHighlightingEnabled = syntaxHighlightingEnabled
+        }
+
+        @objc func scrollViewDidScroll(_ notification: Notification) {
+            guard let clipView = notification.object as? NSClipView,
+                  let documentView = clipView.documentView else { return }
+            let contentHeight = documentView.frame.height
+            let visibleHeight = clipView.bounds.height
+            let scrollableHeight = contentHeight - visibleHeight
+            guard scrollableHeight > 0 else {
+                scrollFraction.wrappedValue = 0
+                return
+            }
+            scrollFraction.wrappedValue = min(1, max(0, clipView.bounds.origin.y / scrollableHeight))
         }
 
         func textDidChange(_ notification: Notification) {

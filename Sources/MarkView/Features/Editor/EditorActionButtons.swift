@@ -9,6 +9,19 @@ struct EditorActionButtons: View {
 
     var body: some View {
         HStack(spacing: 2) {
+            Button {
+                Task { await workspace.activeDocument?.save() }
+            } label: {
+                Image(systemName: "square.and.arrow.down")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(workspace.activeDocument?.isDirty == true ? .primary : .tertiary)
+                    .frame(width: 24, height: 24)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("Save")
+            .disabled(workspace.activeDocument?.isDirty != true)
+
             toggleButton(
                 icon: "textformat",
                 tooltip: workspace.activeSession.isSyntaxHighlightingEnabled
@@ -34,8 +47,8 @@ struct EditorActionButtons: View {
                     ? "rectangle.righthalf.inset.filled.arrow.right"
                     : "rectangle.righthalf.inset.filled",
                 tooltip: workspace.activeSession.isRendererCollapsed
-                    ? "Show markdown preview"
-                    : "Collapse markdown preview",
+                    ? "Show Preview Pane"
+                    : "Hide Preview Pane",
                 isOn: !workspace.activeSession.isRendererCollapsed
             ) {
                 workspace.activeSession.isRendererCollapsed.toggle()

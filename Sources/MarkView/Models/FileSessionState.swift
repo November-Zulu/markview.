@@ -5,4 +5,6 @@ struct FileSessionState {
     var isRendererCollapsed: Bool = false
     var isSyntaxHighlightingEnabled: Bool = true
     var isEditorLightModeEnabled: Bool = false
+    var isScrollLockEnabled: Bool = false
+    var isPreviewLightModeEnabled: Bool = false
 }

@@ -7,7 +7,7 @@ struct MarkViewApp: App {
     @State private var project = ProjectState()
 
     var body: some Scene {
-        WindowGroup("MarkView") {
+        WindowGroup("markview.") {
             ContentView(workspace: workspace, project: project)
                 .onAppear {
                     AppDelegate.workspace = workspace

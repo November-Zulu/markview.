@@ -9,7 +9,7 @@ struct EditorEmptyState: View {
             Text("No File Open")
                 .font(.title3)
                 .foregroundStyle(.secondary)
-            Text("Select a Markdown file from the navigator to start editing.")
+            Text("Select a Markdown file from the Navigation Pane to start editing.")
                 .font(.callout)
                 .foregroundStyle(.tertiary)
                 .multilineTextAlignment(.center)

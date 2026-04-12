@@ -37,7 +37,7 @@ struct NavigatorActionButtons: View {
                 Task { await project.refresh() }
             }
 
-            iconButton("xmark", tooltip: "Close current project folder") {
+            iconButton("xmark", tooltip: "Close project") {
                 closeProject()
             }
         }
