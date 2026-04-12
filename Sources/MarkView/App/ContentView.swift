@@ -24,7 +24,8 @@ struct ContentView: View {
             NSApp.activate(ignoringOtherApps: true)
         }
         .onChange(of: project.selection) { _, newSelection in
-            guard let url = newSelection else { return }
+            guard let url = newSelection,
+                  !url.hasDirectoryPath else { return }
             Task { await workspace.openFile(url) }
         }
         .onChange(of: workspace.activeDocumentID) { _, newID in
