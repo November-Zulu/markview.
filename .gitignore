@@ -1,0 +1,23 @@
+# macOS
+.DS_Store
+
+# Swift Package Manager
+.build/
+.swiftpm/xcode/
+.swiftpm/configuration/
+.swiftpm/xcode/package.xcworkspace/
+.swiftpm/xcode/xcuserdata/
+Packages/
+*.xcodeproj/
+DerivedData/
+
+# Xcode user-specific
+xcuserdata/
+*.xcuserstate
+*.xcuserdatad/
+
+# Build artefacts
+*.o
+*.swiftmodule
+*.swiftdoc
+*.swiftsourceinfo
