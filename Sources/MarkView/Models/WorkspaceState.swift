@@ -37,8 +37,38 @@ final class WorkspaceState {
         }
     }
 
+    private static let openTabsKey = "openTabPaths"
+    private static let activeTabKey = "activeTabPath"
+
     var hasDirtyDocuments: Bool {
         openDocuments.contains(where: \.isDirty)
+    }
+
+    /// Persists the current open tab URLs and active tab to UserDefaults.
+    func saveTabState() {
+        let paths = openDocuments.map { $0.url.path }
+        UserDefaults.standard.set(paths, forKey: Self.openTabsKey)
+        UserDefaults.standard.set(activeDocumentID?.path, forKey: Self.activeTabKey)
+    }
+
+    /// Restores previously open tabs. Only opens files that still exist on disk.
+    func restoreTabs() async {
+        guard let paths = UserDefaults.standard.stringArray(forKey: Self.openTabsKey),
+              !paths.isEmpty else { return }
+        let activePath = UserDefaults.standard.string(forKey: Self.activeTabKey)
+
+        for path in paths {
+            let url = URL(fileURLWithPath: path)
+            guard FileManager.default.fileExists(atPath: path) else { continue }
+            await openFile(url)
+        }
+
+        if let activePath {
+            let activeURL = URL(fileURLWithPath: activePath)
+            if openDocuments.contains(where: { $0.url == activeURL }) {
+                activeDocumentID = activeURL
+            }
+        }
     }
 
     func toggleNavigator() {
@@ -60,6 +90,7 @@ final class WorkspaceState {
         openDocuments.append(doc)
         activeDocumentID = doc.id
         await doc.load()
+        saveTabState()
     }
 
     /// Requests closing a tab. If the document is dirty, raises a confirmation prompt;
@@ -110,5 +141,6 @@ final class WorkspaceState {
                 activeDocumentID = openDocuments[nextIndex].id
             }
         }
+        saveTabState()
     }
 }

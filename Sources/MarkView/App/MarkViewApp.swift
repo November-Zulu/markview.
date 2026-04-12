@@ -14,6 +14,7 @@ struct MarkViewApp: App {
                 }
                 .task {
                     await project.restoreLastProject()
+                    await workspace.restoreTabs()
                 }
         }
         .defaultSize(width: 1200, height: 760)
