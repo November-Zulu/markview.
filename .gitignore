@@ -22,6 +22,12 @@ build/
 # macOS custom icon
 Icon?
 
+# Design source files
+icon-project/
+
+# Development files
+development/
+
 # Build artefacts
 *.o
 *.swiftmodule

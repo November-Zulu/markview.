@@ -2,7 +2,7 @@
 
 A native macOS Markdown editor built for a clean, responsive writing workflow.
 
-![markview. screenshot](screenshots/hero-screenshot.png)
+![markview. screenshot](screenshots/hero.png)
 
 ## Features
 
@@ -23,7 +23,7 @@ A native macOS Markdown editor built for a clean, responsive writing workflow.
 
 | Editor + Preview | Linter | GFM Tables |
 |:---:|:---:|:---:|
-| ![Editor](screenshots/editor-and-preview.png) | ![Linter](screenshots/linter.png) | ![GFM](screenshots/gfm-tables.png) |
+| ![Editor](screenshots/editor.png) | ![Linter](screenshots/linter.png) | ![GFM](screenshots/gfm.png) |
 
 ## Requirements
 
@@ -36,7 +36,7 @@ markview. is a Swift Package with no dependencies beyond Apple's [swift-markdown
 
 ```bash
 # Clone the repository
-git clone https://github.com/November-Zulu/markview.git
+git clone https://github.com/your-username/markview.git
 cd markview
 
 # Build and run
