@@ -12,6 +12,9 @@ struct MarkViewApp: App {
                 .onAppear {
                     AppDelegate.workspace = workspace
                 }
+                .task {
+                    await project.restoreLastProject()
+                }
         }
         .defaultSize(width: 1200, height: 760)
         .windowToolbarStyle(.unified)

@@ -10,10 +10,12 @@ final class ProjectState {
     var loadErrorMessage: String?
     var isLoading: Bool = false
 
+    private static let lastProjectKey = "lastProjectFolder"
     private var watcher: FileSystemWatcher?
 
     func openFolder(_ url: URL) async {
         rootURL = url
+        UserDefaults.standard.set(url.path, forKey: Self.lastProjectKey)
         isLoading = true
         loadErrorMessage = nil
         selection = nil
@@ -42,6 +44,7 @@ final class ProjectState {
         watcher?.stop()
         watcher = nil
         rootURL = nil
+        UserDefaults.standard.removeObject(forKey: Self.lastProjectKey)
         root = nil
         selection = nil
         loadErrorMessage = nil
@@ -65,6 +68,18 @@ final class ProjectState {
     private func treeContains(url: URL, in node: FileNode) -> Bool {
         if node.url == url { return true }
         return node.children?.contains(where: { treeContains(url: url, in: $0) }) ?? false
+    }
+
+    /// Restores the last opened project folder if it still exists on disk.
+    func restoreLastProject() async {
+        guard let path = UserDefaults.standard.string(forKey: Self.lastProjectKey) else { return }
+        let url = URL(fileURLWithPath: path)
+        var isDir: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: path, isDirectory: &isDir), isDir.boolValue else {
+            UserDefaults.standard.removeObject(forKey: Self.lastProjectKey)
+            return
+        }
+        await openFolder(url)
     }
 
     /// Returns the directory URL for the current "focus" in the navigator.
