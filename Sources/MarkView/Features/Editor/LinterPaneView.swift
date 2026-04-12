@@ -7,6 +7,8 @@ struct LinterPaneView: View {
     var onNavigate: (Int) -> Void
     var onClose: () -> Void
 
+    @State private var selectedViolationID: UUID?
+
     var body: some View {
         VStack(spacing: 0) {
             // Header bar
@@ -29,21 +31,22 @@ struct LinterPaneView: View {
 
                 Spacer()
 
-                // Autofix button (click action, not toggle)
+                // Autofix button
                 Button {
                     applyAutofix()
                 } label: {
                     Image(systemName: "wand.and.stars")
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(hasFixableViolations ? .primary : .tertiary)
+                        .foregroundStyle(autofixEnabled ? .primary : .tertiary)
                         .frame(width: 24, height: 24)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .help("Autofix all fixable issues")
-                .disabled(!hasFixableViolations)
+                .help(autofixHelpText)
+                .disabled(!autofixEnabled)
 
                 Button {
+                    selectedViolationID = nil
                     onClose()
                 } label: {
                     Image(systemName: "xmark")
@@ -82,15 +85,42 @@ struct LinterPaneView: View {
             }
         }
         .background(DesignTokens.editorBackground)
+        .onChange(of: violations) {
+            // Clear selection if the selected violation no longer exists (e.g. after fix)
+            if let id = selectedViolationID, !violations.contains(where: { $0.id == id }) {
+                selectedViolationID = nil
+            }
+        }
     }
 
-    private var hasFixableViolations: Bool {
-        violations.contains { $0.fix != nil }
+    private var selectedViolation: LintViolation? {
+        guard let id = selectedViolationID else { return nil }
+        return violations.first { $0.id == id }
+    }
+
+    private var autofixEnabled: Bool {
+        if let selected = selectedViolation {
+            return selected.fix != nil
+        }
+        return violations.contains { $0.fix != nil }
+    }
+
+    private var autofixHelpText: String {
+        if selectedViolation != nil {
+            return "Autofix selected issue"
+        }
+        return "Autofix all fixable issues"
     }
 
     private func violationRow(_ violation: LintViolation) -> some View {
-        Button {
-            onNavigate(violation.line)
+        let isSelected = selectedViolationID == violation.id
+        return Button {
+            if selectedViolationID == violation.id {
+                selectedViolationID = nil
+            } else {
+                selectedViolationID = violation.id
+                onNavigate(violation.line)
+            }
         } label: {
             HStack(spacing: 8) {
                 Text("L\(violation.line)")
@@ -124,13 +154,20 @@ struct LinterPaneView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .background(Color.clear)
+        .background(isSelected ? Color.accentColor.opacity(0.25) : Color.clear)
     }
 
     private func applyAutofix() {
         guard let hash = lintSourceHash,
               document.content.hashValue == hash else { return }
-        let fixed = MarkdownLinter.applyFixes(to: document.content, violations: violations)
-        document.content = fixed
+
+        if let selected = selectedViolation {
+            let fixed = MarkdownLinter.applyFixes(to: document.content, violations: [selected])
+            document.content = fixed
+            selectedViolationID = nil
+        } else {
+            let fixed = MarkdownLinter.applyFixes(to: document.content, violations: violations)
+            document.content = fixed
+        }
     }
 }

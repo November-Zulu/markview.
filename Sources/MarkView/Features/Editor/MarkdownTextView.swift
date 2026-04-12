@@ -42,12 +42,17 @@ struct MarkdownTextView: NSViewRepresentable {
         }
         context.coordinator.lintImmediately()
 
-        // Line number gutter — always create ruler, toggle visibility as needed.
-        // Creating the ruler during updateNSView disrupts NSScrollView tiling.
-        let rulerView = LineNumberRulerView(textView: textView)
-        scrollView.hasVerticalRuler = true
-        scrollView.verticalRulerView = rulerView
-        scrollView.rulersVisible = lineNumbersEnabled
+        // Line number gutter — floating subview on the scroll view (not the text
+        // view or NSRulerView) to avoid tiling/rendering issues with SwiftUI.
+        let gutterView = LineNumberGutterView(textView: textView)
+        scrollView.addSubview(gutterView)
+        context.coordinator.gutterView = gutterView
+        if lineNumbersEnabled {
+            gutterView.isHidden = false
+            gutterView.updateFrame()
+        } else {
+            gutterView.isHidden = true
+        }
 
         // Observe scroll position changes
         scrollView.contentView.postsBoundsChangedNotifications = true
@@ -103,8 +108,17 @@ struct MarkdownTextView: NSViewRepresentable {
             DispatchQueue.main.async { self.scrollToLine = nil }
         }
 
-        // Toggle line number gutter visibility
-        scrollView.rulersVisible = lineNumbersEnabled
+        // Toggle line number gutter
+        if let gutter = coordinator.gutterView {
+            if lineNumbersEnabled {
+                gutter.isHidden = false
+                gutter.updateFrame()
+                gutter.needsDisplay = true
+            } else {
+                gutter.isHidden = true
+                textView.textContainerInset = NSSize(width: 16, height: 16)
+            }
+        }
     }
 
     func makeCoordinator() -> Coordinator {
@@ -186,6 +200,7 @@ struct MarkdownTextView: NSViewRepresentable {
         var lintViolations: Binding<[LintViolation]>
         var lintSourceHash: Binding<Int?>
         weak var textView: NSTextView?
+        var gutterView: LineNumberGutterView?
         var isApplyingUserEdit = false
         var lastSyntaxHighlightingEnabled: Bool
         var lastEditorLightModeEnabled: Bool = false
@@ -332,15 +347,24 @@ struct MarkdownTextView: NSViewRepresentable {
         private func applyLintUnderlines(_ violations: [LintViolation], for source: String) {
             guard let textView, let storage = textView.textStorage else { return }
             guard textView.string == source else { return }
-            guard !violations.isEmpty else { return }
 
             let selectedRanges = textView.selectedRanges
+            let fullRange = NSRange(location: 0, length: storage.length)
+            let lintStyle = NSUnderlineStyle.patternDot.rawValue | NSUnderlineStyle.single.rawValue
+
             storage.beginEditing()
+            // Clear only lint-specific dotted underlines, preserving link underlines
+            storage.enumerateAttribute(.underlineStyle, in: fullRange, options: []) { value, range, _ in
+                if let style = value as? Int, style == lintStyle {
+                    storage.removeAttribute(.underlineStyle, range: range)
+                    storage.removeAttribute(.underlineColor, range: range)
+                }
+            }
             for violation in violations {
                 guard let range = violation.underlineRange,
                       range.location + range.length <= storage.length else { continue }
                 storage.addAttributes([
-                    .underlineStyle: NSUnderlineStyle.patternDot.rawValue | NSUnderlineStyle.single.rawValue,
+                    .underlineStyle: lintStyle,
                     .underlineColor: DesignTokens.LinterColors.warning,
                 ], range: range)
             }

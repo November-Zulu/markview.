@@ -36,7 +36,11 @@ struct LintFix: Sendable {
     let replacement: String
 }
 
-struct LintViolation: Identifiable, Sendable {
+struct LintViolation: Identifiable, Equatable, Sendable {
+    static func == (lhs: LintViolation, rhs: LintViolation) -> Bool {
+        lhs.id == rhs.id
+    }
+
     let id = UUID()
     let rule: LintRule
     let line: Int

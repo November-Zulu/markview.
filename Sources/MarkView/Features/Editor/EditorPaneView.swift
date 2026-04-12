@@ -4,10 +4,6 @@ struct EditorPaneView: View {
     @Bindable var workspace: WorkspaceState
     @State private var scrollToLine: Int?
 
-    private var session: FileSessionState {
-        workspace.activeSession
-    }
-
     var body: some View {
         if workspace.openDocuments.isEmpty {
             EditorEmptyState()
@@ -27,10 +23,12 @@ struct EditorPaneView: View {
 
     @ViewBuilder
     private func documentWithLinter(_ active: OpenDocument) -> some View {
-        if session.isLinterPaneVisible {
+        let session = workspace.activeSession
+        let linterVisible = session.isLinterPaneVisible
+        if linterVisible {
             GeometryReader { geo in
                 VStack(spacing: 0) {
-                    documentContent(active)
+                    documentContent(active, session: session)
                         .frame(height: geo.size.height * 0.67)
                     Divider()
                     LinterPaneView(
@@ -44,11 +42,11 @@ struct EditorPaneView: View {
                 }
             }
         } else {
-            documentContent(active)
+            documentContent(active, session: session)
         }
     }
 
-    private func documentContent(_ active: OpenDocument) -> some View {
+    private func documentContent(_ active: OpenDocument, session: FileSessionState) -> some View {
         let bindableDoc = Bindable(active)
         return DocumentContentView(
             document: active,

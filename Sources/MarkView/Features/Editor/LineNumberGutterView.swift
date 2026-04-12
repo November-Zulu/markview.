@@ -1,33 +1,40 @@
 import AppKit
 
-/// A vertical ruler view that draws line numbers alongside an NSTextView.
-final class LineNumberRulerView: NSRulerView {
+/// Draws line numbers in a gutter alongside an NSTextView.
+/// Added as a floating subview of the NSScrollView (not the text view or
+/// NSRulerView) to avoid both NSScrollView tiling issues and NSTextView
+/// rendering interference.
+final class LineNumberGutterView: NSView {
 
     private weak var textView: NSTextView?
     private let lineNumberFont = NSFont.monospacedSystemFont(ofSize: 10, weight: .regular)
     private let textColor = NSColor.secondaryLabelColor
 
+    static let defaultGutterWidth: CGFloat = 36
+
     init(textView: NSTextView) {
         self.textView = textView
-        super.init(scrollView: textView.enclosingScrollView!, orientation: .verticalRuler)
-        self.clientView = textView
-        self.ruleThickness = 36
+        super.init(frame: .zero)
 
         NotificationCenter.default.addObserver(
-            self, selector: #selector(textDidChange(_:)),
+            self, selector: #selector(handleChange(_:)),
             name: NSText.didChangeNotification, object: textView
         )
         if let clipView = textView.enclosingScrollView?.contentView {
             clipView.postsBoundsChangedNotifications = true
             NotificationCenter.default.addObserver(
-                self, selector: #selector(boundsDidChange(_:)),
+                self, selector: #selector(handleChange(_:)),
                 name: NSView.boundsDidChangeNotification, object: clipView
             )
         }
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(handleChange(_:)),
+            name: NSView.frameDidChangeNotification, object: textView.enclosingScrollView
+        )
     }
 
     @available(*, unavailable)
-    required init(coder: NSCoder) {
+    required init?(coder: NSCoder) {
         fatalError("init(coder:) not supported")
     }
 
@@ -35,42 +42,47 @@ final class LineNumberRulerView: NSRulerView {
         NotificationCenter.default.removeObserver(self)
     }
 
-    @objc private func textDidChange(_ notification: Notification) {
-        updateThickness()
+    @objc private func handleChange(_ notification: Notification) {
+        updateFrame()
         needsDisplay = true
     }
 
-    @objc private func boundsDidChange(_ notification: Notification) {
-        needsDisplay = true
-    }
-
-    private func updateThickness() {
-        guard let textView else { return }
+    /// Recalculates gutter width based on line count and repositions the frame.
+    func updateFrame() {
+        guard let textView, let scrollView = textView.enclosingScrollView else { return }
         let lineCount = max(1, textView.string.components(separatedBy: "\n").count)
         let digitCount = String(lineCount).count
-        let newThickness = CGFloat(max(30, digitCount * 8 + 16))
-        if ruleThickness != newThickness {
-            ruleThickness = newThickness
+        let gutterWidth = CGFloat(max(30, digitCount * 8 + 16))
+
+        // Fixed at the left edge of the scroll view, full visible height
+        let visibleHeight = scrollView.contentView.bounds.height
+        frame = NSRect(x: 0, y: 0, width: gutterWidth, height: visibleHeight)
+
+        // Ensure text container inset leaves room for the gutter
+        if textView.textContainerInset.width != gutterWidth {
+            textView.textContainerInset = NSSize(width: gutterWidth, height: 16)
         }
     }
 
-    override func drawHashMarksAndLabels(in rect: NSRect) {
-        guard let textView,
-              let layoutManager = textView.layoutManager,
-              let textContainer = textView.textContainer else { return }
+    override var isFlipped: Bool { true }
 
-        let visibleRect = scrollView?.contentView.bounds ?? rect
+    override func draw(_ dirtyRect: NSRect) {
+        guard let textView,
+              let layoutManager = textView.layoutManager else { return }
+
+        let scrollView = textView.enclosingScrollView
+        let clipOrigin = scrollView?.contentView.bounds.origin ?? .zero
         let textInset = textView.textContainerInset
 
         // Draw background
-        (textView.backgroundColor).set()
-        rect.fill()
+        textView.backgroundColor.set()
+        bounds.fill()
 
-        // Draw separator line
+        // Draw separator line on the right edge
         NSColor.separatorColor.set()
         let separatorX = bounds.maxX - 0.5
-        NSBezierPath.strokeLine(from: NSPoint(x: separatorX, y: rect.minY),
-                                to: NSPoint(x: separatorX, y: rect.maxY))
+        NSBezierPath.strokeLine(from: NSPoint(x: separatorX, y: 0),
+                                to: NSPoint(x: separatorX, y: bounds.height))
 
         let attributes: [NSAttributedString.Key: Any] = [
             .font: lineNumberFont,
@@ -85,17 +97,16 @@ final class LineNumberRulerView: NSRulerView {
         let numberOfGlyphs = layoutManager.numberOfGlyphs
 
         while glyphIndex < numberOfGlyphs {
-            let charIndex = layoutManager.characterIndexForGlyph(at: glyphIndex)
             var lineRange = NSRange()
             let lineRect = layoutManager.lineFragmentRect(
                 forGlyphAt: glyphIndex, effectiveRange: &lineRange
             )
 
-            let y = lineRect.minY + textInset.height - visibleRect.origin.y
+            // Convert from text view coords to our local coords
+            let y = lineRect.minY + textInset.height - clipOrigin.y
             let lineHeight = lineRect.height
 
-            // Only draw if visible
-            if y + lineHeight >= rect.minY, y <= rect.maxY {
+            if y + lineHeight >= 0, y <= bounds.height {
                 let label = "\(lineNumber)" as NSString
                 let labelSize = label.size(withAttributes: attributes)
                 let labelY = y + (lineHeight - labelSize.height) / 2.0
@@ -108,13 +119,13 @@ final class LineNumberRulerView: NSRulerView {
             lineNumber += 1
         }
 
-        // If the text ends with a newline, draw one more line number
+        // If text ends with a newline, draw one more line number
         if totalLength > 0 && text.character(at: totalLength - 1) == UInt16(UnicodeScalar("\n").value) {
             let extraRect = layoutManager.extraLineFragmentRect
             if !extraRect.isEmpty {
-                let y = extraRect.minY + textInset.height - visibleRect.origin.y
+                let y = extraRect.minY + textInset.height - clipOrigin.y
                 let lineHeight = extraRect.height
-                if y + lineHeight >= rect.minY, y <= rect.maxY {
+                if y + lineHeight >= 0, y <= bounds.height {
                     let label = "\(lineNumber)" as NSString
                     let labelSize = label.size(withAttributes: attributes)
                     let labelY = y + (lineHeight - labelSize.height) / 2.0

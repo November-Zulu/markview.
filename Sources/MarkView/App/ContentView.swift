@@ -18,7 +18,10 @@ struct ContentView: View {
             Divider()
             StatusBarView(
                 content: workspace.activeDocument?.content,
-                lintViolationCount: workspace.activeDocument?.lintViolations.count ?? 0
+                lintViolationCount: workspace.activeDocument?.lintViolations.count ?? 0,
+                onLintTap: {
+                    workspace.activeSession.isLinterPaneVisible.toggle()
+                }
             )
         }
         .frame(minWidth: 900, minHeight: 560)
