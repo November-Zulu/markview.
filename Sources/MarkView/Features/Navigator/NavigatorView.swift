@@ -2,6 +2,7 @@ import SwiftUI
 
 struct NavigatorView: View {
     @Bindable var project: ProjectState
+    @Bindable var workspace: WorkspaceState
 
     var body: some View {
         Group {
@@ -39,7 +40,9 @@ struct NavigatorView: View {
                         .font(.system(size: 11, weight: .semibold))
                         .textCase(.uppercase)
                         .foregroundStyle(.secondary)
+                        .lineLimit(1)
                     Spacer(minLength: 0)
+                    NavigatorActionButtons(project: project, workspace: workspace)
                 }
             }
         }
@@ -79,7 +82,7 @@ struct NavigatorView: View {
 }
 
 #Preview("Empty") {
-    NavigatorView(project: ProjectState())
+    NavigatorView(project: ProjectState(), workspace: WorkspaceState())
         .frame(width: 280, height: 500)
 }
 

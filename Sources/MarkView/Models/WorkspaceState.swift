@@ -10,12 +10,27 @@ final class WorkspaceState {
     var openDocuments: [OpenDocument] = []
     var activeDocumentID: URL?
 
+    /// Per-file session state (split ratio, toggles). Session-only, not persisted.
+    var fileSessions: [URL: FileSessionState] = [:]
+
     /// Non-nil while a "save changes before closing" prompt is pending for a tab close.
     var closeConfirmation: OpenDocument?
 
     var activeDocument: OpenDocument? {
         guard let id = activeDocumentID else { return nil }
         return openDocuments.first { $0.id == id }
+    }
+
+    /// Returns the session state for the active document, creating a default if needed.
+    var activeSession: FileSessionState {
+        get {
+            guard let id = activeDocumentID else { return FileSessionState() }
+            return fileSessions[id, default: FileSessionState()]
+        }
+        set {
+            guard let id = activeDocumentID else { return }
+            fileSessions[id] = newValue
+        }
     }
 
     var hasDirtyDocuments: Bool {
@@ -81,6 +96,7 @@ final class WorkspaceState {
     func closeDocument(_ id: URL) {
         guard let index = openDocuments.firstIndex(where: { $0.id == id }) else { return }
         openDocuments.remove(at: index)
+        fileSessions.removeValue(forKey: id)
 
         if activeDocumentID == id {
             if openDocuments.isEmpty {

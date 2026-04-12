@@ -4,6 +4,8 @@ import SwiftUI
 /// an error state, and the `MarkdownTextView` once contents are ready.
 struct DocumentContentView: View {
     @Bindable var document: OpenDocument
+    var syntaxHighlightingEnabled: Bool = true
+    var editorLightModeEnabled: Bool = false
 
     var body: some View {
         Group {
@@ -22,7 +24,11 @@ struct DocumentContentView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
-                MarkdownTextView(text: $document.content)
+                MarkdownTextView(
+                    text: $document.content,
+                    syntaxHighlightingEnabled: syntaxHighlightingEnabled,
+                    editorLightModeEnabled: editorLightModeEnabled
+                )
             }
         }
         .background(DesignTokens.editorBackground)

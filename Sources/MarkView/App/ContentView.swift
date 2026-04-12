@@ -7,19 +7,9 @@ struct ContentView: View {
 
     var body: some View {
         NavigationSplitView(columnVisibility: $workspace.columnVisibility) {
-            NavigatorView(project: project)
+            NavigatorView(project: project, workspace: workspace)
         } detail: {
-            HSplitView {
-                EditorPaneView(workspace: workspace)
-                    .frame(minWidth: 320)
-                    .layoutPriority(1)
-
-                if workspace.isPreviewVisible {
-                    PreviewPaneView(workspace: workspace)
-                        .frame(minWidth: 240, idealWidth: 420)
-                        .layoutPriority(1)
-                }
-            }
+            SplitEditorView(workspace: workspace)
         }
         .navigationSplitViewStyle(.balanced)
         .frame(minWidth: 900, minHeight: 560)
@@ -30,6 +20,11 @@ struct ContentView: View {
         .onChange(of: project.selection) { _, newSelection in
             guard let url = newSelection else { return }
             Task { await workspace.openFile(url) }
+        }
+        .onChange(of: workspace.activeDocumentID) { _, newID in
+            if project.selection != newID {
+                project.selection = newID
+            }
         }
         .confirmationDialog(
             closeConfirmationTitle,

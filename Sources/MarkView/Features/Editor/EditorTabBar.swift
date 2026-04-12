@@ -4,20 +4,28 @@ struct EditorTabBar: View {
     @Bindable var workspace: WorkspaceState
 
     var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 0) {
-                ForEach(workspace.openDocuments) { doc in
-                    TabItem(
-                        document: doc,
-                        isActive: doc.id == workspace.activeDocumentID,
-                        onSelect: { workspace.activeDocumentID = doc.id },
-                        onClose: { workspace.requestClose(doc.id) }
-                    )
-                    Divider()
-                        .frame(height: 20)
+        HStack(spacing: 0) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 0) {
+                    ForEach(workspace.openDocuments) { doc in
+                        TabItem(
+                            document: doc,
+                            isActive: doc.id == workspace.activeDocumentID,
+                            onSelect: { workspace.activeDocumentID = doc.id },
+                            onClose: { workspace.requestClose(doc.id) }
+                        )
+                        Divider()
+                            .frame(height: 20)
+                    }
+                    Spacer(minLength: 0)
                 }
-                Spacer(minLength: 0)
             }
+
+            Divider()
+                .frame(height: 20)
+
+            EditorActionButtons(workspace: workspace)
+                .padding(.horizontal, 8)
         }
         .frame(height: 32)
         .background(DesignTokens.sidebarBackground)

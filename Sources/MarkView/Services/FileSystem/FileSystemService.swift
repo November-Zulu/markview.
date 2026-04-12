@@ -21,6 +21,64 @@ enum FileSystemService {
         }.value
     }
 
+    /// Creates an empty file with the given name inside `directory`, off the main actor.
+    static func createFile(name: String, in directory: URL) async throws -> URL {
+        try await Task.detached(priority: .userInitiated) {
+            var fileName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !fileName.isEmpty else {
+                throw FileSystemError.unwritable(directory, underlying: NSError(
+                    domain: "MarkView", code: 1,
+                    userInfo: [NSLocalizedDescriptionKey: "File name cannot be empty."]
+                ))
+            }
+            // Append .md if no extension provided
+            if !fileName.contains(".") {
+                fileName += ".md"
+            }
+            let fileURL = directory.appending(path: fileName)
+            let fm = FileManager.default
+            if fm.fileExists(atPath: fileURL.path) {
+                throw FileSystemError.unwritable(fileURL, underlying: NSError(
+                    domain: "MarkView", code: 2,
+                    userInfo: [NSLocalizedDescriptionKey: "A file named \(fileName) already exists."]
+                ))
+            }
+            do {
+                try "".write(to: fileURL, atomically: true, encoding: .utf8)
+            } catch {
+                throw FileSystemError.unwritable(fileURL, underlying: error)
+            }
+            return fileURL
+        }.value
+    }
+
+    /// Creates a directory with the given name inside `parent`, off the main actor.
+    static func createDirectory(name: String, in parent: URL) async throws -> URL {
+        try await Task.detached(priority: .userInitiated) {
+            let dirName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !dirName.isEmpty else {
+                throw FileSystemError.unwritable(parent, underlying: NSError(
+                    domain: "MarkView", code: 1,
+                    userInfo: [NSLocalizedDescriptionKey: "Folder name cannot be empty."]
+                ))
+            }
+            let dirURL = parent.appending(path: dirName)
+            let fm = FileManager.default
+            if fm.fileExists(atPath: dirURL.path) {
+                throw FileSystemError.unwritable(dirURL, underlying: NSError(
+                    domain: "MarkView", code: 2,
+                    userInfo: [NSLocalizedDescriptionKey: "A folder named \(dirName) already exists."]
+                ))
+            }
+            do {
+                try fm.createDirectory(at: dirURL, withIntermediateDirectories: false)
+            } catch {
+                throw FileSystemError.unwritable(dirURL, underlying: error)
+            }
+            return dirURL
+        }.value
+    }
+
     /// Writes `contents` to `url` atomically as UTF-8 text, off the main actor.
     static func write(_ contents: String, to url: URL) async throws {
         try await Task.detached(priority: .userInitiated) {

@@ -5,13 +5,14 @@ import AppKit
 /// monospaced font, line wrapping, undo/redo, no smart substitutions.
 struct MarkdownTextView: NSViewRepresentable {
     @Binding var text: String
+    var syntaxHighlightingEnabled: Bool = true
+    var editorLightModeEnabled: Bool = false
 
     func makeNSView(context: Context) -> NSScrollView {
         let scrollView = NSTextView.scrollableTextView()
         scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = false
         scrollView.drawsBackground = true
-        scrollView.backgroundColor = .textBackgroundColor
         scrollView.autohidesScrollers = false
         scrollView.borderType = .noBorder
 
@@ -20,12 +21,17 @@ struct MarkdownTextView: NSViewRepresentable {
         }
 
         configure(textView)
+        applyAppearance(textView)
         textView.delegate = context.coordinator
         context.coordinator.textView = textView
 
         // Initial content without triggering a change notification.
         textView.string = text
         textView.undoManager?.removeAllActions()
+
+        if syntaxHighlightingEnabled {
+            context.coordinator.scheduleHighlight()
+        }
 
         return scrollView
     }
@@ -34,15 +40,34 @@ struct MarkdownTextView: NSViewRepresentable {
         guard let textView = scrollView.documentView as? NSTextView else { return }
         guard !context.coordinator.isApplyingUserEdit else { return }
 
+        let coordinator = context.coordinator
+        let highlightingChanged = coordinator.lastSyntaxHighlightingEnabled != syntaxHighlightingEnabled
+        let appearanceChanged = coordinator.lastEditorLightModeEnabled != editorLightModeEnabled
+
+        coordinator.lastSyntaxHighlightingEnabled = syntaxHighlightingEnabled
+        coordinator.lastEditorLightModeEnabled = editorLightModeEnabled
+
         if textView.string != text {
             let selectedRanges = textView.selectedRanges
             textView.string = text
             textView.selectedRanges = selectedRanges
         }
+
+        if appearanceChanged {
+            applyAppearance(textView)
+        }
+
+        if highlightingChanged {
+            if syntaxHighlightingEnabled {
+                coordinator.scheduleHighlight()
+            } else {
+                coordinator.clearHighlighting()
+            }
+        }
     }
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(text: $text)
+        Coordinator(text: $text, syntaxHighlightingEnabled: syntaxHighlightingEnabled)
     }
 
     // MARK: - Configuration
@@ -69,7 +94,6 @@ struct MarkdownTextView: NSViewRepresentable {
         textView.font = .monospacedSystemFont(ofSize: 13, weight: .regular)
         textView.textColor = .labelColor
         textView.insertionPointColor = .labelColor
-        textView.backgroundColor = .textBackgroundColor
         textView.drawsBackground = true
         textView.textContainerInset = NSSize(width: 16, height: 16)
 
@@ -88,6 +112,24 @@ struct MarkdownTextView: NSViewRepresentable {
         )
     }
 
+    private func applyAppearance(_ textView: NSTextView) {
+        if editorLightModeEnabled {
+            textView.appearance = NSAppearance(named: .aqua)
+            textView.backgroundColor = .white
+            textView.textColor = .black
+            textView.insertionPointColor = .black
+        } else {
+            textView.appearance = nil // inherit system
+            textView.backgroundColor = .textBackgroundColor
+            textView.textColor = .labelColor
+            textView.insertionPointColor = .labelColor
+        }
+        // Also update the enclosing scroll view
+        if let scrollView = textView.enclosingScrollView {
+            scrollView.backgroundColor = textView.backgroundColor
+        }
+    }
+
     // MARK: - Coordinator
 
     @MainActor
@@ -95,9 +137,13 @@ struct MarkdownTextView: NSViewRepresentable {
         var text: Binding<String>
         weak var textView: NSTextView?
         var isApplyingUserEdit = false
+        var lastSyntaxHighlightingEnabled: Bool
+        var lastEditorLightModeEnabled: Bool = false
+        private var highlightTask: Task<Void, Never>?
 
-        init(text: Binding<String>) {
+        init(text: Binding<String>, syntaxHighlightingEnabled: Bool) {
             self.text = text
+            self.lastSyntaxHighlightingEnabled = syntaxHighlightingEnabled
         }
 
         func textDidChange(_ notification: Notification) {
@@ -105,6 +151,53 @@ struct MarkdownTextView: NSViewRepresentable {
             isApplyingUserEdit = true
             text.wrappedValue = textView.string
             isApplyingUserEdit = false
+
+            if lastSyntaxHighlightingEnabled {
+                scheduleHighlight()
+            }
+        }
+
+        func scheduleHighlight() {
+            highlightTask?.cancel()
+            highlightTask = Task { [weak self] in
+                try? await Task.sleep(for: .milliseconds(200))
+                guard !Task.isCancelled else { return }
+                guard let self, let textView = self.textView else { return }
+
+                let source = textView.string
+                let highlights = await MarkdownHighlighter.highlights(for: source)
+                guard !Task.isCancelled else { return }
+                guard let storage = textView.textStorage else { return }
+
+                // Verify text hasn't changed while we were computing
+                guard textView.string == source else { return }
+
+                let fullRange = NSRange(location: 0, length: storage.length)
+                let selectedRanges = textView.selectedRanges
+
+                storage.beginEditing()
+                storage.setAttributes(MarkdownHighlighter.baseAttributes, range: fullRange)
+                for highlight in highlights {
+                    guard highlight.range.location + highlight.range.length <= storage.length else {
+                        continue
+                    }
+                    storage.addAttributes(highlight.attributes, range: highlight.range)
+                }
+                storage.endEditing()
+
+                textView.selectedRanges = selectedRanges
+            }
+        }
+
+        func clearHighlighting() {
+            highlightTask?.cancel()
+            guard let textView, let storage = textView.textStorage else { return }
+            let selectedRanges = textView.selectedRanges
+            let fullRange = NSRange(location: 0, length: storage.length)
+            storage.beginEditing()
+            storage.setAttributes(MarkdownHighlighter.baseAttributes, range: fullRange)
+            storage.endEditing()
+            textView.selectedRanges = selectedRanges
         }
     }
 }

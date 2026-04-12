@@ -14,6 +14,7 @@ struct MarkViewApp: App {
                 }
         }
         .defaultSize(width: 1200, height: 760)
+        .windowToolbarStyle(.unified)
         .commands {
             AppCommands(workspace: workspace, project: project)
         }
