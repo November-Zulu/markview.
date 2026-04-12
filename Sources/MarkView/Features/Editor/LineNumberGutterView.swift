@@ -93,33 +93,41 @@ final class LineNumberGutterView: NSView {
         let totalLength = text.length
 
         var lineNumber = 1
-        var glyphIndex = 0
-        let numberOfGlyphs = layoutManager.numberOfGlyphs
+        var charIndex = 0
 
-        while glyphIndex < numberOfGlyphs {
-            var lineRange = NSRange()
-            let lineRect = layoutManager.lineFragmentRect(
-                forGlyphAt: glyphIndex, effectiveRange: &lineRange
+        while charIndex < totalLength {
+            // Get the full logical line range (up to and including the newline)
+            let logicalLineRange = text.lineRange(for: NSMakeRange(charIndex, 0))
+
+            // Find the first glyph in this logical line and draw the number
+            // at the first visual line fragment's position
+            let glyphRange = layoutManager.glyphRange(
+                forCharacterRange: logicalLineRange, actualCharacterRange: nil
             )
 
-            // Convert from text view coords to our local coords
-            let y = lineRect.minY + textInset.height - clipOrigin.y
-            let lineHeight = lineRect.height
+            if glyphRange.length > 0 {
+                var firstFragRange = NSRange()
+                let firstFragRect = layoutManager.lineFragmentRect(
+                    forGlyphAt: glyphRange.location, effectiveRange: &firstFragRange
+                )
 
-            if y + lineHeight >= 0, y <= bounds.height {
-                let label = "\(lineNumber)" as NSString
-                let labelSize = label.size(withAttributes: attributes)
-                let labelY = y + (lineHeight - labelSize.height) / 2.0
-                let labelX = bounds.width - labelSize.width - 6
+                let y = firstFragRect.minY + textInset.height - clipOrigin.y
+                let lineHeight = firstFragRect.height
 
-                label.draw(at: NSPoint(x: labelX, y: labelY), withAttributes: attributes)
+                if y + lineHeight >= 0, y <= bounds.height {
+                    let label = "\(lineNumber)" as NSString
+                    let labelSize = label.size(withAttributes: attributes)
+                    let labelY = y + (lineHeight - labelSize.height) / 2.0
+                    let labelX = bounds.width - labelSize.width - 6
+                    label.draw(at: NSPoint(x: labelX, y: labelY), withAttributes: attributes)
+                }
             }
 
-            glyphIndex = NSMaxRange(lineRange)
+            charIndex = NSMaxRange(logicalLineRange)
             lineNumber += 1
         }
 
-        // If text ends with a newline, draw one more line number
+        // If text ends with a newline, draw one more line number for the empty last line
         if totalLength > 0 && text.character(at: totalLength - 1) == UInt16(UnicodeScalar("\n").value) {
             let extraRect = layoutManager.extraLineFragmentRect
             if !extraRect.isEmpty {

@@ -203,6 +203,52 @@ final class MarkdownLinterTests: XCTestCase {
         }
     }
 
+    // MARK: - Line number accuracy
+
+    func testLineNumbersMatchActualLines() async {
+        // Realistic document with known violations at specific lines
+        let text = [
+            "# Title",           // line 1
+            "",                  // line 2
+            "Some paragraph.",   // line 3
+            "## Section",        // line 4 — missing blank line before heading
+            "",                  // line 5
+            "Hello   ",          // line 6 — trailing whitespace (3 spaces)
+            "",                  // line 7
+            "* item one",        // line 8 — wrong list marker
+            "- item two",        // line 9
+            "",                  // line 10
+            "### Deep",          // line 11 — heading hierarchy skip (h2 → h3 is fine, but let's keep it)
+            "",                  // line 12
+            "[text]()",          // line 13 — empty link destination
+            "",                  // line 14
+        ].joined(separator: "\n")
+
+        let violations = await MarkdownLinter.lint(text)
+
+        // Check specific violations and their line numbers
+        let blankAround = violations.filter { $0.rule == .blankLineAroundHeading }
+        let trailingWS = violations.filter { $0.rule == .trailingWhitespace }
+        let listMarker = violations.filter { $0.rule == .consistentListMarker }
+        let emptyLink = violations.filter { $0.rule == .noEmptyLinks }
+
+        // "## Section" on line 4 should have blank-line-around-heading violation
+        XCTAssertTrue(blankAround.contains { $0.line == 4 },
+            "Expected blank-line-around-heading on line 4, got lines: \(blankAround.map(\.line))")
+
+        // Trailing whitespace on line 6
+        XCTAssertTrue(trailingWS.contains { $0.line == 6 },
+            "Expected trailing-whitespace on line 6, got lines: \(trailingWS.map(\.line))")
+
+        // Wrong list marker on line 8
+        XCTAssertTrue(listMarker.contains { $0.line == 8 },
+            "Expected consistent-list-marker on line 8, got lines: \(listMarker.map(\.line))")
+
+        // Empty link on line 13
+        XCTAssertTrue(emptyLink.contains { $0.line == 13 },
+            "Expected no-empty-links on line 13, got lines: \(emptyLink.map(\.line))")
+    }
+
     // MARK: - Clean document
 
     func testCleanDocumentHasNoViolations() async {
