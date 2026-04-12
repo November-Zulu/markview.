@@ -7,4 +7,6 @@ struct FileSessionState {
     var isEditorLightModeEnabled: Bool = false
     var isScrollLockEnabled: Bool = false
     var isPreviewLightModeEnabled: Bool = false
+    var isLinterPaneVisible: Bool = false
+    var isLineNumbersEnabled: Bool = false
 }

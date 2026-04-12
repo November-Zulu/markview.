@@ -36,5 +36,15 @@ enum DesignTokens {
         static let link: NSColor = .linkColor
         static let blockQuote: NSColor = .tertiaryLabelColor
         static let listMarker: NSColor = .systemTeal
+        static let strikethrough: NSColor = .systemGray
+        static let table: NSColor = .systemIndigo
+    }
+
+    // MARK: - Linter Colors
+
+    enum LinterColors {
+        static let warning: NSColor = .systemYellow
+        static let error: NSColor = .systemRed
+        static let fixable: NSColor = .systemOrange
     }
 }

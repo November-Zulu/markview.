@@ -51,20 +51,11 @@ struct NavigatorView: View {
 
     @ViewBuilder
     private func row(for node: FileNode) -> some View {
-        let selected = node.url == project.selection
         if node.isMarkdown {
             FileTreeRow(node: node)
                 .tag(node.url)
-                .listRowBackground(
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(selected ? Color.accentColor.opacity(0.2) : .clear)
-                )
         } else {
             FileTreeRow(node: node)
-                .listRowBackground(
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(selected ? Color.accentColor.opacity(0.2) : .clear)
-                )
         }
     }
 

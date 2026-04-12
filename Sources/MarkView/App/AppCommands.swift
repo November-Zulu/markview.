@@ -45,6 +45,18 @@ struct AppCommands: Commands {
             .keyboardShortcut("p", modifiers: [.command, .option])
 
             Divider()
+
+            Button(workspace.activeSession.isLinterPaneVisible ? "Hide Linter" : "Show Linter") {
+                workspace.activeSession.isLinterPaneVisible.toggle()
+            }
+            .keyboardShortcut("l", modifiers: [.command, .shift])
+            .disabled(workspace.activeDocumentID == nil)
+
+            Button(workspace.activeSession.isLineNumbersEnabled ? "Hide Line Numbers" : "Show Line Numbers") {
+                workspace.activeSession.isLineNumbersEnabled.toggle()
+            }
+            .keyboardShortcut("n", modifiers: [.command, .shift])
+            .disabled(workspace.activeDocumentID == nil)
         }
     }
 }

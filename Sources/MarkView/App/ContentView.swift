@@ -16,7 +16,10 @@ struct ContentView: View {
             .navigationTitle("markview.")
 
             Divider()
-            StatusBarView(content: workspace.activeDocument?.content)
+            StatusBarView(
+                content: workspace.activeDocument?.content,
+                lintViolationCount: workspace.activeDocument?.lintViolations.count ?? 0
+            )
         }
         .frame(minWidth: 900, minHeight: 560)
         .task {

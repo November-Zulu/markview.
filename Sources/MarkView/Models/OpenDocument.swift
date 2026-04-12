@@ -10,6 +10,8 @@ final class OpenDocument: Identifiable {
     var isLoading: Bool
     var loadErrorMessage: String?
     var saveErrorMessage: String?
+    var lintViolations: [LintViolation] = []
+    var lintSourceHash: Int?
 
     nonisolated var id: URL { url }
     nonisolated var displayName: String { url.lastPathComponent }

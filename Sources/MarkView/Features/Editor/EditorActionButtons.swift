@@ -53,6 +53,30 @@ struct EditorActionButtons: View {
             ) {
                 workspace.activeSession.isRendererCollapsed.toggle()
             }
+
+            Divider()
+                .frame(height: 14)
+                .padding(.horizontal, 2)
+
+            toggleButton(
+                icon: "list.number",
+                tooltip: workspace.activeSession.isLineNumbersEnabled
+                    ? "Hide line numbers"
+                    : "Show line numbers",
+                isOn: workspace.activeSession.isLineNumbersEnabled
+            ) {
+                workspace.activeSession.isLineNumbersEnabled.toggle()
+            }
+
+            toggleButton(
+                icon: "checklist",
+                tooltip: workspace.activeSession.isLinterPaneVisible
+                    ? "Hide Linter"
+                    : "Show Linter",
+                isOn: workspace.activeSession.isLinterPaneVisible
+            ) {
+                workspace.activeSession.isLinterPaneVisible.toggle()
+            }
         }
         .disabled(!hasActiveDocument)
     }

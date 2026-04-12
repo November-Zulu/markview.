@@ -42,6 +42,8 @@ private struct BlockView: View {
             ListBlockView(listItems: Array(ordered.listItems), ordered: true)
         case let codeBlock as CodeBlock:
             CodeBlockView(code: codeBlock.code)
+        case let table as Markdown.Table:
+            TableBlockView(table: table)
         case is ThematicBreak:
             Divider()
         default:
@@ -96,10 +98,18 @@ private struct ListBlockView: View {
         VStack(alignment: .leading, spacing: 6) {
             ForEach(Array(listItems.enumerated()), id: \.offset) { index, item in
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(marker(for: index))
-                        .font(.system(size: 14))
-                        .foregroundStyle(.secondary)
-                        .frame(minWidth: 20, alignment: .trailing)
+                    if let checkbox = item.checkbox {
+                        Image(systemName: checkbox == .checked
+                              ? "checkmark.square.fill" : "square")
+                            .font(.system(size: 13))
+                            .foregroundStyle(checkbox == .checked ? Color.accentColor : Color.secondary)
+                            .frame(minWidth: 20, alignment: .trailing)
+                    } else {
+                        Text(marker(for: index))
+                            .font(.system(size: 14))
+                            .foregroundStyle(.secondary)
+                            .frame(minWidth: 20, alignment: .trailing)
+                    }
                     VStack(alignment: .leading, spacing: 6) {
                         ForEach(Array(item.blockChildren.enumerated()), id: \.offset) { _, child in
                             BlockView(block: child)
@@ -125,6 +135,64 @@ private struct CodeBlockView: View {
             .padding(12)
             .background(Color.secondary.opacity(0.12))
             .clipShape(RoundedRectangle(cornerRadius: 6))
+    }
+}
+
+// MARK: - Table rendering
+
+private struct TableBlockView: View {
+    let table: Markdown.Table
+
+    var body: some View {
+        let alignments = table.columnAlignments
+        let headerCells = Array(table.head.cells)
+        let bodyRows = Array(table.body.rows)
+
+        Grid(alignment: .leading, horizontalSpacing: 0, verticalSpacing: 0) {
+            // Header row
+            GridRow {
+                ForEach(Array(headerCells.enumerated()), id: \.offset) { colIndex, cell in
+                    Text(InlineRenderer.attributedString(for: cell))
+                        .font(.system(size: 13, weight: .semibold))
+                        .frame(maxWidth: .infinity, alignment: gridAlignment(alignments, column: colIndex))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                }
+            }
+
+            Divider()
+
+            // Body rows
+            ForEach(Array(bodyRows.enumerated()), id: \.offset) { _, row in
+                GridRow {
+                    ForEach(Array(row.cells.enumerated()), id: \.offset) { colIndex, cell in
+                        Text(InlineRenderer.attributedString(for: cell))
+                            .font(.system(size: 13))
+                            .frame(maxWidth: .infinity, alignment: gridAlignment(alignments, column: colIndex))
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                    }
+                }
+                Divider()
+            }
+        }
+        .background(Color.secondary.opacity(0.06))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+        .overlay(
+            RoundedRectangle(cornerRadius: 6)
+                .strokeBorder(Color.secondary.opacity(0.2), lineWidth: 1)
+        )
+    }
+
+    private func gridAlignment(_ alignments: [Markdown.Table.ColumnAlignment?], column: Int) -> Alignment {
+        guard column < alignments.count, let alignment = alignments[column] else {
+            return .leading
+        }
+        switch alignment {
+        case .left: return .leading
+        case .center: return .center
+        case .right: return .trailing
+        }
     }
 }
 
@@ -166,6 +234,12 @@ private enum InlineRenderer {
             }
             s.foregroundColor = NSColor.linkColor
             s.underlineStyle = NSUnderlineStyle.single
+            return s
+
+        case let strike as Strikethrough:
+            var s = attributedString(for: strike)
+            s.strikethroughStyle = .single
+            s.foregroundColor = NSColor.secondaryLabelColor
             return s
 
         case is SoftBreak:

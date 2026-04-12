@@ -6,8 +6,13 @@ import AppKit
 struct MarkdownTextView: NSViewRepresentable {
     @Binding var text: String
     @Binding var scrollFraction: CGFloat
+    @Binding var lintViolations: [LintViolation]
+    @Binding var lintSourceHash: Int?
+    /// Set to a line number to scroll the editor there, then reset to nil.
+    @Binding var scrollToLine: Int?
     var syntaxHighlightingEnabled: Bool = true
     var editorLightModeEnabled: Bool = false
+    var lineNumbersEnabled: Bool = false
 
     func makeNSView(context: Context) -> NSScrollView {
         let scrollView = NSTextView.scrollableTextView()
@@ -23,16 +28,26 @@ struct MarkdownTextView: NSViewRepresentable {
 
         configure(textView)
         applyAppearance(textView)
-        textView.delegate = context.coordinator
-        context.coordinator.textView = textView
 
-        // Initial content without triggering a change notification.
+        // Set initial content before attaching the delegate so that
+        // the programmatic string assignment cannot trigger textDidChange.
         textView.string = text
         textView.undoManager?.removeAllActions()
 
+        textView.delegate = context.coordinator
+        context.coordinator.textView = textView
+
         if syntaxHighlightingEnabled {
-            context.coordinator.scheduleHighlight()
+            context.coordinator.applyHighlightImmediately()
         }
+        context.coordinator.lintImmediately()
+
+        // Line number gutter — always create ruler, toggle visibility as needed.
+        // Creating the ruler during updateNSView disrupts NSScrollView tiling.
+        let rulerView = LineNumberRulerView(textView: textView)
+        scrollView.hasVerticalRuler = true
+        scrollView.verticalRulerView = rulerView
+        scrollView.rulersVisible = lineNumbersEnabled
 
         // Observe scroll position changes
         scrollView.contentView.postsBoundsChangedNotifications = true
@@ -71,15 +86,35 @@ struct MarkdownTextView: NSViewRepresentable {
 
         if highlightingChanged || (textChanged && syntaxHighlightingEnabled) {
             if syntaxHighlightingEnabled {
-                coordinator.scheduleHighlight()
+                // Programmatic text changes get immediate highlighting (no debounce)
+                // to prevent SwiftUI update cycles from wiping applied attributes.
+                coordinator.applyHighlightImmediately()
             } else {
                 coordinator.clearHighlighting()
             }
         }
+
+        if textChanged {
+            coordinator.lintImmediately()
+        }
+
+        if let line = scrollToLine {
+            coordinator.scrollToLine(line)
+            DispatchQueue.main.async { self.scrollToLine = nil }
+        }
+
+        // Toggle line number gutter visibility
+        scrollView.rulersVisible = lineNumbersEnabled
     }
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(text: $text, scrollFraction: $scrollFraction, syntaxHighlightingEnabled: syntaxHighlightingEnabled)
+        Coordinator(
+            text: $text,
+            scrollFraction: $scrollFraction,
+            lintViolations: $lintViolations,
+            lintSourceHash: $lintSourceHash,
+            syntaxHighlightingEnabled: syntaxHighlightingEnabled
+        )
     }
 
     // MARK: - Configuration
@@ -148,15 +183,26 @@ struct MarkdownTextView: NSViewRepresentable {
     final class Coordinator: NSObject, NSTextViewDelegate {
         var text: Binding<String>
         var scrollFraction: Binding<CGFloat>
+        var lintViolations: Binding<[LintViolation]>
+        var lintSourceHash: Binding<Int?>
         weak var textView: NSTextView?
         var isApplyingUserEdit = false
         var lastSyntaxHighlightingEnabled: Bool
         var lastEditorLightModeEnabled: Bool = false
         private var highlightTask: Task<Void, Never>?
+        private var lintTask: Task<Void, Never>?
 
-        init(text: Binding<String>, scrollFraction: Binding<CGFloat>, syntaxHighlightingEnabled: Bool) {
+        init(
+            text: Binding<String>,
+            scrollFraction: Binding<CGFloat>,
+            lintViolations: Binding<[LintViolation]>,
+            lintSourceHash: Binding<Int?>,
+            syntaxHighlightingEnabled: Bool
+        ) {
             self.text = text
             self.scrollFraction = scrollFraction
+            self.lintViolations = lintViolations
+            self.lintSourceHash = lintSourceHash
             self.lastSyntaxHighlightingEnabled = syntaxHighlightingEnabled
         }
 
@@ -182,38 +228,63 @@ struct MarkdownTextView: NSViewRepresentable {
             if lastSyntaxHighlightingEnabled {
                 scheduleHighlight()
             }
+            scheduleLint()
         }
 
+        /// Highlights immediately (no debounce). Used for initial load and
+        /// programmatic text changes where the text is already stable.
+        func applyHighlightImmediately() {
+            highlightTask?.cancel()
+            highlightTask = Task { [weak self] in
+                guard let self, let textView = self.textView else { return }
+                let source = textView.string
+                let highlights = await MarkdownHighlighter.highlights(for: source)
+                guard !Task.isCancelled else { return }
+                self.applyHighlights(highlights, for: source)
+            }
+        }
+
+        /// Highlights after a debounce delay. Used for user typing.
         func scheduleHighlight() {
             highlightTask?.cancel()
             highlightTask = Task { [weak self] in
                 try? await Task.sleep(for: .milliseconds(200))
                 guard !Task.isCancelled else { return }
                 guard let self, let textView = self.textView else { return }
-
                 let source = textView.string
                 let highlights = await MarkdownHighlighter.highlights(for: source)
                 guard !Task.isCancelled else { return }
-                guard let storage = textView.textStorage else { return }
-
-                // Verify text hasn't changed while we were computing
-                guard textView.string == source else { return }
-
-                let fullRange = NSRange(location: 0, length: storage.length)
-                let selectedRanges = textView.selectedRanges
-
-                storage.beginEditing()
-                storage.setAttributes(MarkdownHighlighter.baseAttributes, range: fullRange)
-                for highlight in highlights {
-                    guard highlight.range.location + highlight.range.length <= storage.length else {
-                        continue
-                    }
-                    storage.addAttributes(highlight.attributes, range: highlight.range)
-                }
-                storage.endEditing()
-
-                textView.selectedRanges = selectedRanges
+                self.applyHighlights(highlights, for: source)
             }
+        }
+
+        private func applyHighlights(_ highlights: [MarkdownHighlighter.Highlight], for source: String) {
+            guard let textView, let storage = textView.textStorage else { return }
+            guard textView.string == source else { return }
+
+            let fullRange = NSRange(location: 0, length: storage.length)
+            let selectedRanges = textView.selectedRanges
+
+            storage.beginEditing()
+            storage.setAttributes(MarkdownHighlighter.baseAttributes, range: fullRange)
+            for highlight in highlights {
+                guard highlight.range.location + highlight.range.length <= storage.length else {
+                    continue
+                }
+                storage.addAttributes(highlight.attributes, range: highlight.range)
+            }
+            // Re-apply lint underlines so they survive highlight resets
+            for violation in lintViolations.wrappedValue {
+                guard let range = violation.underlineRange,
+                      range.location + range.length <= storage.length else { continue }
+                storage.addAttributes([
+                    .underlineStyle: NSUnderlineStyle.patternDot.rawValue | NSUnderlineStyle.single.rawValue,
+                    .underlineColor: DesignTokens.LinterColors.warning,
+                ], range: range)
+            }
+            storage.endEditing()
+
+            textView.selectedRanges = selectedRanges
         }
 
         func clearHighlighting() {
@@ -225,6 +296,69 @@ struct MarkdownTextView: NSViewRepresentable {
             storage.setAttributes(MarkdownHighlighter.baseAttributes, range: fullRange)
             storage.endEditing()
             textView.selectedRanges = selectedRanges
+        }
+
+        // MARK: - Linting
+
+        func lintImmediately() {
+            lintTask?.cancel()
+            lintTask = Task { [weak self] in
+                guard let self, let textView = self.textView else { return }
+                let source = textView.string
+                let violations = await MarkdownLinter.lint(source)
+                guard !Task.isCancelled else { return }
+                self.lintViolations.wrappedValue = violations
+                self.lintSourceHash.wrappedValue = source.hashValue
+                self.applyLintUnderlines(violations, for: source)
+            }
+        }
+
+        func scheduleLint() {
+            lintTask?.cancel()
+            lintTask = Task { [weak self] in
+                try? await Task.sleep(for: .milliseconds(250))
+                guard !Task.isCancelled else { return }
+                guard let self, let textView = self.textView else { return }
+                let source = textView.string
+                let violations = await MarkdownLinter.lint(source)
+                guard !Task.isCancelled else { return }
+                self.lintViolations.wrappedValue = violations
+                self.lintSourceHash.wrappedValue = source.hashValue
+                self.applyLintUnderlines(violations, for: source)
+            }
+        }
+
+        /// Applies dotted underlines at violation locations in the text storage.
+        private func applyLintUnderlines(_ violations: [LintViolation], for source: String) {
+            guard let textView, let storage = textView.textStorage else { return }
+            guard textView.string == source else { return }
+            guard !violations.isEmpty else { return }
+
+            let selectedRanges = textView.selectedRanges
+            storage.beginEditing()
+            for violation in violations {
+                guard let range = violation.underlineRange,
+                      range.location + range.length <= storage.length else { continue }
+                storage.addAttributes([
+                    .underlineStyle: NSUnderlineStyle.patternDot.rawValue | NSUnderlineStyle.single.rawValue,
+                    .underlineColor: DesignTokens.LinterColors.warning,
+                ], range: range)
+            }
+            storage.endEditing()
+            textView.selectedRanges = selectedRanges
+        }
+
+        // MARK: - Scroll to line
+
+        func scrollToLine(_ lineNumber: Int) {
+            guard let textView else { return }
+            let text = textView.string
+            let lineOffsets = MarkdownHighlighter.buildLineOffsets(text)
+            guard lineNumber >= 1, lineNumber < lineOffsets.count else { return }
+            let location = lineOffsets[lineNumber]
+            let range = NSRange(location: location, length: 0)
+            textView.setSelectedRange(range)
+            textView.scrollRangeToVisible(range)
         }
     }
 }
