@@ -60,7 +60,7 @@ struct LinterPaneView: View {
             }
             .padding(.horizontal, 10)
             .frame(height: 28)
-            .background(DesignTokens.statusBarBackground)
+            .background(DesignTokens.chromeMaterial)
 
             Divider()
 

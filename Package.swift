@@ -20,6 +20,9 @@ let package = Package(
             ],
             path: "Sources/MarkView",
             exclude: ["Resources/Info.plist"],
+            resources: [
+                .copy("Resources/markview.icns")
+            ],
             linkerSettings: [
                 .unsafeFlags([
                     "-Xlinker", "-sectcreate",

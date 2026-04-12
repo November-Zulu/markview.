@@ -9,6 +9,10 @@ struct PreviewPaneView: View {
         workspace.activeSession.isScrollLockEnabled
     }
 
+    private var isLightMode: Bool {
+        workspace.activeSession.isPreviewLightModeEnabled
+    }
+
     var body: some View {
         Group {
             if workspace.activeDocument == nil {
@@ -19,7 +23,7 @@ struct PreviewPaneView: View {
                 Color.clear
             }
         }
-        .background(DesignTokens.paneBackground)
+        .background(isLightMode ? AnyShapeStyle(Color.white) : AnyShapeStyle(DesignTokens.contentMaterial))
         .onChange(of: workspace.activeDocument?.id) { _, _ in
             parsed = nil
         }

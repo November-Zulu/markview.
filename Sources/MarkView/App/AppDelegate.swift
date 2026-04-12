@@ -6,6 +6,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Weak reference so the delegate never prolongs the workspace's lifetime.
     weak static var workspace: WorkspaceState?
 
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        // In a .app bundle the icns lives in Contents/Resources/;
+        // when running as a bare SPM executable it's inside the resource bundle.
+        let iconURL = Bundle.main.url(forResource: "markview", withExtension: "icns")
+            ?? Bundle.main.url(forResource: "MarkView", withExtension: "bundle")
+                .flatMap { Bundle(url: $0) }?
+                .url(forResource: "markview", withExtension: "icns")
+        if let iconURL, let icon = NSImage(contentsOf: iconURL) {
+            NSApp.applicationIconImage = icon
+        }
+    }
+
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         guard let workspace = Self.workspace else { return .terminateNow }
         return Self.promptToSaveDirtyDocuments(workspace: workspace)

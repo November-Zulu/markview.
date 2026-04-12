@@ -15,7 +15,7 @@ struct NavigatorView: View {
                 NavigatorEmptyState(project: project)
             }
         }
-        .background(DesignTokens.paneBackground)
+        .background(DesignTokens.contentMaterial)
         .overlay(alignment: .bottom) {
             if let message = project.loadErrorMessage {
                 errorBanner(message)

@@ -45,7 +45,7 @@ struct PreviewHeaderBar: View {
             .padding(.horizontal, 8)
         }
         .frame(height: 32)
-        .background(DesignTokens.sidebarBackground)
+        .background(DesignTokens.chromeMaterial)
     }
 
     private func toggleButton(icon: String, tooltip: String, isOn: Bool, action: @escaping () -> Void) -> some View {

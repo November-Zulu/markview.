@@ -2,23 +2,28 @@ import SwiftUI
 import AppKit
 
 enum DesignTokens {
-    /// Slightly lighter than the window background in dark mode (like Finder's sidebar),
-    /// and a hair darker than window background in light mode.
-    static let sidebarBackground = Color(nsColor: NSColor(name: "MarkViewSidebarBackground") { appearance in
-        let isDark = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-        return isDark
-            ? NSColor(calibratedWhite: 0.20, alpha: 1.0)
-            : NSColor(calibratedWhite: 0.925, alpha: 1.0)
-    })
+    /// Sidebar, tab bar, preview header.
+    static let sidebarBackground = Color.clear
 
-    /// Primary editor/preview surface — matches the window background.
-    static let paneBackground = Color(nsColor: .windowBackgroundColor)
+    /// Primary editor/preview surface.
+    static let paneBackground = Color.clear
 
-    /// Editor text background — slightly different in some modes from the generic pane.
+    /// Navigator file tree background.
+    static let navigatorBackground = Color.clear
+
+    /// Editor text background.
     static let editorBackground = Color(nsColor: .textBackgroundColor)
 
-    /// Status bar background — matches the title bar / window chrome.
-    static let statusBarBackground = Color(nsColor: .windowBackgroundColor)
+    /// Status bar background.
+    static let statusBarBackground = Color.clear
+
+    // MARK: - Material styles for backgrounds
+
+    /// Material for chrome surfaces (sidebar, tab bar, status bar, preview header).
+    static let chromeMaterial: Material = .regularMaterial
+
+    /// Material for content surfaces (navigator, preview pane).
+    static let contentMaterial: Material = .thickMaterial
 
     // MARK: - Syntax Highlighting Colors
 

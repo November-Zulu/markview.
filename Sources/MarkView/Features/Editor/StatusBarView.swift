@@ -34,7 +34,7 @@ struct StatusBarView: View {
         }
         .padding(.horizontal, 30)
         .frame(height: 22)
-        .background(DesignTokens.statusBarBackground)
+        .background(DesignTokens.chromeMaterial)
     }
 
     private var characterCount: Int {

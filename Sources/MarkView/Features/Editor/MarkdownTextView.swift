@@ -89,7 +89,7 @@ struct MarkdownTextView: NSViewRepresentable {
             applyAppearance(textView)
         }
 
-        if highlightingChanged || (textChanged && syntaxHighlightingEnabled) {
+        if highlightingChanged || appearanceChanged || (textChanged && syntaxHighlightingEnabled) {
             if syntaxHighlightingEnabled {
                 // Programmatic text changes get immediate highlighting (no debounce)
                 // to prevent SwiftUI update cycles from wiping applied attributes.

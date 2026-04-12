@@ -16,6 +16,12 @@ xcuserdata/
 *.xcuserstate
 *.xcuserdatad/
 
+# App bundle output
+build/
+
+# macOS custom icon
+Icon?
+
 # Build artefacts
 *.o
 *.swiftmodule

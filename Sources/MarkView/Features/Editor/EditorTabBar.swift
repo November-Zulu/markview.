@@ -73,7 +73,7 @@ struct EditorTabBar: View {
                 .padding(.horizontal, 8)
         }
         .frame(height: 32)
-        .background(DesignTokens.sidebarBackground)
+        .background(DesignTokens.chromeMaterial)
     }
 
     @State private var tabContentWidth: CGFloat = 0

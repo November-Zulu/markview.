@@ -16,7 +16,7 @@ struct PreviewEmptyState: View {
                 .padding(.horizontal, 24)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(DesignTokens.paneBackground)
+        .background(DesignTokens.contentMaterial)
     }
 }
 
