@@ -28,11 +28,14 @@ A native macOS Markdown editor built for a clean, responsive writing workflow.
 ## Requirements
 
 - macOS 14 (Sonoma) or later
-- Swift 5.9+
 
-## Build
+## Install
 
-markview. is a Swift Package with no dependencies beyond Apple's [swift-markdown](https://github.com/apple/swift-markdown).
+Download the latest `markview.app.zip` from [Releases](https://github.com/November-Zulu/markview/releases), unzip, and move to your Applications folder.
+
+## Build from Source
+
+markview. is a Swift Package with no dependencies beyond Apple's [swift-markdown](https://github.com/apple/swift-markdown). Requires Swift 5.9+.
 
 ```bash
 # Clone the repository
@@ -43,6 +46,9 @@ cd markview
 swift build
 swift run MarkView
 
+# Or build the .app bundle
+scripts/build-app.sh
+
 # Or open in Xcode
 open Package.swift
 ```
@@ -52,6 +58,10 @@ open Package.swift
 ```bash
 swift test
 ```
+
+## Sample Files
+
+The `sample-md/` folder contains 20 markdown documents covering a range of topics and sizes — useful for testing the editor, renderer, and linter.
 
 ## Keyboard Shortcuts
 
