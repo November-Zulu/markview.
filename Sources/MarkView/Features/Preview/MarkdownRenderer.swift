@@ -25,14 +25,15 @@ struct MarkdownRenderer: View {
 
 private struct BlockView: View {
     let block: any BlockMarkup
+    @Environment(\.markdownTheme) private var theme
 
     var body: some View {
         switch block {
         case let heading as Heading:
             headingView(heading)
         case let paragraph as Paragraph:
-            Text(InlineRenderer.attributedString(for: paragraph))
-                .font(.system(size: 14))
+            Text(InlineRenderer(theme: theme).attributedString(for: paragraph))
+                .font(.system(size: theme.bodyFontSize))
                 .fixedSize(horizontal: false, vertical: true)
         case let quote as BlockQuote:
             BlockQuoteView(blockQuote: quote)
@@ -53,31 +54,21 @@ private struct BlockView: View {
 
     @ViewBuilder
     private func headingView(_ heading: Heading) -> some View {
-        Text(InlineRenderer.attributedString(for: heading))
-            .font(.system(size: fontSize(for: heading.level), weight: .bold))
+        Text(InlineRenderer(theme: theme).attributedString(for: heading))
+            .font(.system(size: theme.headingSize(level: heading.level), weight: .bold))
             .fixedSize(horizontal: false, vertical: true)
             .padding(.top, heading.level == 1 ? 4 : 2)
-    }
-
-    private func fontSize(for level: Int) -> CGFloat {
-        switch level {
-        case 1: return 28
-        case 2: return 22
-        case 3: return 18
-        case 4: return 16
-        case 5: return 14
-        default: return 13
-        }
     }
 }
 
 private struct BlockQuoteView: View {
     let blockQuote: BlockQuote
+    @Environment(\.markdownTheme) private var theme
 
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
             Rectangle()
-                .fill(Color.secondary.opacity(0.5))
+                .fill(theme.blockQuoteRule)
                 .frame(width: 3)
             VStack(alignment: .leading, spacing: 10) {
                 ForEach(Array(blockQuote.blockChildren.enumerated()), id: \.offset) { _, child in
@@ -85,7 +76,7 @@ private struct BlockQuoteView: View {
                 }
             }
             .padding(.leading, 12)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(theme.blockQuoteText)
         }
     }
 }
@@ -93,6 +84,7 @@ private struct BlockQuoteView: View {
 private struct ListBlockView: View {
     let listItems: [ListItem]
     let ordered: Bool
+    @Environment(\.markdownTheme) private var theme
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -101,13 +93,15 @@ private struct ListBlockView: View {
                     if let checkbox = item.checkbox {
                         Image(systemName: checkbox == .checked
                               ? "checkmark.square.fill" : "square")
-                            .font(.system(size: 13))
-                            .foregroundStyle(checkbox == .checked ? Color.accentColor : Color.secondary)
+                            .font(.system(size: theme.codeFontSize))
+                            .foregroundStyle(checkbox == .checked
+                                             ? theme.checkboxCheckedColor
+                                             : theme.checkboxUncheckedColor)
                             .frame(minWidth: 20, alignment: .trailing)
                     } else {
                         Text(marker(for: index))
-                            .font(.system(size: 14))
-                            .foregroundStyle(.secondary)
+                            .font(.system(size: theme.bodyFontSize))
+                            .foregroundStyle(theme.listMarkerColor)
                             .frame(minWidth: 20, alignment: .trailing)
                     }
                     VStack(alignment: .leading, spacing: 6) {
@@ -127,13 +121,14 @@ private struct ListBlockView: View {
 
 private struct CodeBlockView: View {
     let code: String
+    @Environment(\.markdownTheme) private var theme
 
     var body: some View {
         Text(code)
-            .font(.system(size: 13, design: .monospaced))
+            .font(.system(size: theme.codeFontSize, design: .monospaced))
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(12)
-            .background(Color.secondary.opacity(0.12))
+            .background(theme.codeBlockBackground)
             .clipShape(RoundedRectangle(cornerRadius: 6))
     }
 }
@@ -142,18 +137,20 @@ private struct CodeBlockView: View {
 
 private struct TableBlockView: View {
     let table: Markdown.Table
+    @Environment(\.markdownTheme) private var theme
 
     var body: some View {
         let alignments = table.columnAlignments
         let headerCells = Array(table.head.cells)
         let bodyRows = Array(table.body.rows)
+        let inline = InlineRenderer(theme: theme)
 
         Grid(alignment: .leading, horizontalSpacing: 0, verticalSpacing: 0) {
             // Header row
             GridRow {
                 ForEach(Array(headerCells.enumerated()), id: \.offset) { colIndex, cell in
-                    Text(InlineRenderer.attributedString(for: cell))
-                        .font(.system(size: 13, weight: .semibold))
+                    Text(inline.attributedString(for: cell))
+                        .font(.system(size: theme.codeFontSize, weight: .semibold))
                         .frame(maxWidth: .infinity, alignment: gridAlignment(alignments, column: colIndex))
                         .padding(.horizontal, 10)
                         .padding(.vertical, 6)
@@ -166,8 +163,8 @@ private struct TableBlockView: View {
             ForEach(Array(bodyRows.enumerated()), id: \.offset) { _, row in
                 GridRow {
                     ForEach(Array(row.cells.enumerated()), id: \.offset) { colIndex, cell in
-                        Text(InlineRenderer.attributedString(for: cell))
-                            .font(.system(size: 13))
+                        Text(inline.attributedString(for: cell))
+                            .font(.system(size: theme.codeFontSize))
                             .frame(maxWidth: .infinity, alignment: gridAlignment(alignments, column: colIndex))
                             .padding(.horizontal, 10)
                             .padding(.vertical, 5)
@@ -176,11 +173,11 @@ private struct TableBlockView: View {
                 Divider()
             }
         }
-        .background(Color.secondary.opacity(0.06))
+        .background(theme.tableBackground)
         .clipShape(RoundedRectangle(cornerRadius: 6))
         .overlay(
             RoundedRectangle(cornerRadius: 6)
-                .strokeBorder(Color.secondary.opacity(0.2), lineWidth: 1)
+                .strokeBorder(theme.tableBorder, lineWidth: 1)
         )
     }
 
@@ -198,8 +195,10 @@ private struct TableBlockView: View {
 
 // MARK: - Inline rendering
 
-private enum InlineRenderer {
-    static func attributedString(for markup: any Markup) -> AttributedString {
+struct InlineRenderer {
+    let theme: MarkdownTheme
+
+    func attributedString(for markup: any Markup) -> AttributedString {
         var result = AttributedString("")
         for child in markup.children {
             result.append(attributedString(forNode: child))
@@ -207,7 +206,7 @@ private enum InlineRenderer {
         return result
     }
 
-    private static func attributedString(forNode markup: Markup) -> AttributedString {
+    private func attributedString(forNode markup: Markup) -> AttributedString {
         switch markup {
         case let text as Markdown.Text:
             return AttributedString(text.string)
@@ -232,14 +231,14 @@ private enum InlineRenderer {
             if let dest = link.destination, let url = URL(string: dest) {
                 s.link = url
             }
-            s.foregroundColor = NSColor.linkColor
+            s.foregroundColor = NSColor(theme.linkColor)
             s.underlineStyle = NSUnderlineStyle.single
             return s
 
         case let strike as Strikethrough:
             var s = attributedString(for: strike)
             s.strikethroughStyle = .single
-            s.foregroundColor = NSColor.secondaryLabelColor
+            s.foregroundColor = NSColor(theme.strikethroughColor)
             return s
 
         case is SoftBreak:
