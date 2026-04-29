@@ -20,7 +20,7 @@ struct PreviewHeaderBar: View {
                     tooltip: "Toggle scroll lock",
                     isOn: workspace.activeSession.isScrollLockEnabled
                 ) {
-                    workspace.activeSession.isScrollLockEnabled.toggle()
+                    workspace.activeSession.toggleScrollLock()
                 }
 
                 toggleButton(
@@ -29,7 +29,7 @@ struct PreviewHeaderBar: View {
                     tooltip: "Toggle light mode",
                     isOn: workspace.activeSession.isPreviewLightModeEnabled
                 ) {
-                    workspace.activeSession.isPreviewLightModeEnabled.toggle()
+                    workspace.activeSession.togglePreviewLightMode()
                 }
 
                 toggleButton(
@@ -39,7 +39,7 @@ struct PreviewHeaderBar: View {
                     tooltip: "Toggle Preview Pane",
                     isOn: !workspace.activeSession.isRendererCollapsed
                 ) {
-                    workspace.activeSession.isRendererCollapsed.toggle()
+                    workspace.activeSession.toggleRendererCollapsed()
                 }
             }
             .padding(.horizontal, 8)

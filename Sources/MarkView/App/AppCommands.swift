@@ -47,13 +47,13 @@ struct AppCommands: Commands {
             Divider()
 
             Button(workspace.activeSession.isLinterPaneVisible ? "Hide Linter" : "Show Linter") {
-                workspace.activeSession.isLinterPaneVisible.toggle()
+                workspace.activeSession.toggleLinterPane()
             }
             .keyboardShortcut("l", modifiers: [.command, .shift])
             .disabled(workspace.activeDocumentID == nil)
 
             Button(workspace.activeSession.isLineNumbersEnabled ? "Hide Line Numbers" : "Show Line Numbers") {
-                workspace.activeSession.isLineNumbersEnabled.toggle()
+                workspace.activeSession.toggleLineNumbers()
             }
             .keyboardShortcut("n", modifiers: [.command, .shift])
             .disabled(workspace.activeDocumentID == nil)

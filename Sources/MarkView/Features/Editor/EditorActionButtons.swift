@@ -29,7 +29,7 @@ struct EditorActionButtons: View {
                     : "Enable syntax highlighting",
                 isOn: workspace.activeSession.isSyntaxHighlightingEnabled
             ) {
-                workspace.activeSession.isSyntaxHighlightingEnabled.toggle()
+                workspace.activeSession.toggleSyntaxHighlighting()
             }
 
             toggleButton(
@@ -39,7 +39,7 @@ struct EditorActionButtons: View {
                     : "Enable light mode",
                 isOn: workspace.activeSession.isEditorLightModeEnabled
             ) {
-                workspace.activeSession.isEditorLightModeEnabled.toggle()
+                workspace.activeSession.toggleEditorLightMode()
             }
 
             toggleButton(
@@ -51,7 +51,7 @@ struct EditorActionButtons: View {
                     : "Hide Preview Pane",
                 isOn: !workspace.activeSession.isRendererCollapsed
             ) {
-                workspace.activeSession.isRendererCollapsed.toggle()
+                workspace.activeSession.toggleRendererCollapsed()
             }
 
             Divider()
@@ -65,7 +65,7 @@ struct EditorActionButtons: View {
                     : "Show line numbers",
                 isOn: workspace.activeSession.isLineNumbersEnabled
             ) {
-                workspace.activeSession.isLineNumbersEnabled.toggle()
+                workspace.activeSession.toggleLineNumbers()
             }
 
             toggleButton(
@@ -75,7 +75,7 @@ struct EditorActionButtons: View {
                     : "Show Linter",
                 isOn: workspace.activeSession.isLinterPaneVisible
             ) {
-                workspace.activeSession.isLinterPaneVisible.toggle()
+                workspace.activeSession.toggleLinterPane()
             }
         }
         .disabled(!hasActiveDocument)

@@ -21,7 +21,7 @@ struct ContentView: View {
                 content: workspace.activeDocument?.content,
                 lintViolationCount: workspace.activeDocument?.lintViolations.count ?? 0,
                 onLintTap: {
-                    workspace.activeSession.isLinterPaneVisible.toggle()
+                    workspace.activeSession.toggleLinterPane()
                 }
             )
         }

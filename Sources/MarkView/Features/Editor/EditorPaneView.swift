@@ -36,7 +36,7 @@ struct EditorPaneView: View {
                         document: active,
                         lintSourceHash: active.lintSourceHash,
                         onNavigate: { line in scrollToLine = line },
-                        onClose: { workspace.activeSession.isLinterPaneVisible = false }
+                        onClose: { workspace.activeSession.setLinterPaneVisible(false) }
                     )
                     .frame(maxHeight: .infinity)
                 }

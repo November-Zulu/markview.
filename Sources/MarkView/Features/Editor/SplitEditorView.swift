@@ -48,7 +48,7 @@ struct SplitEditorView: View {
                                 .onEnded { value in
                                     let base = workspace.activeSession.splitRatio * geo.size.width
                                     let newRatio = (base + value.translation.width) / geo.size.width
-                                    workspace.activeSession.splitRatio = min(max(newRatio, 0.25), 0.75)
+                                    workspace.activeSession.setSplitRatio(newRatio)
                                 }
                         )
                 }
