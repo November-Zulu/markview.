@@ -37,7 +37,7 @@ struct PreviewPaneView: View {
             try? await Task.sleep(for: .milliseconds(150))
             guard !Task.isCancelled else { return }
 
-            let result = await MarkdownParser.parse(doc.content)
+            let result = await MarkdownAnalysis.analyze(doc.content).document
             guard !Task.isCancelled else { return }
             parsed = result
         }

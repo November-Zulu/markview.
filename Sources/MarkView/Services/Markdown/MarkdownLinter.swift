@@ -57,43 +57,27 @@ enum MarkdownLinter {
 
     /// Lint the given markdown text and return violations sorted by line number.
     static func lint(_ text: String) async -> [LintViolation] {
-        await Task.detached(priority: .userInitiated) {
-            let lines = text.splitLines()
-            let lineOffsets = MarkdownHighlighter.buildLineOffsets(text)
-            let document = Document(parsing: text)
+        let analysis = await MarkdownAnalysis.analyze(text)
+        let lines = text.splitLines()
 
-            // Pass 1: AST-based rules
-            var walker = LintWalker(source: text, lines: lines, lineOffsets: lineOffsets)
-            walker.visit(document)
-            var violations = walker.violations
+        // Pass 1: AST-based rules
+        var walker = LintWalker(analysis: analysis, lines: lines)
+        walker.visit(analysis.document)
+        var violations = walker.violations
 
-            // Pass 2: Line-based rules
-            violations.append(contentsOf: checkTrailingWhitespace(lines, lineOffsets: lineOffsets, source: text))
-            violations.append(contentsOf: checkConsecutiveBlankLines(lines, lineOffsets: lineOffsets, source: text))
-            violations.append(contentsOf: checkAtxHeadingSpace(lines, lineOffsets: lineOffsets, source: text))
+        // Pass 2: Line-based rules
+        violations.append(contentsOf: checkTrailingWhitespace(lines, analysis: analysis))
+        violations.append(contentsOf: checkConsecutiveBlankLines(lines, analysis: analysis))
+        violations.append(contentsOf: checkAtxHeadingSpace(lines, analysis: analysis))
 
-            violations.sort { $0.line < $1.line }
+        violations.sort { $0.line < $1.line }
 
-            // Compute underline ranges for each violation (full line, UTF-16 for NSTextStorage)
-            for i in violations.indices {
-                let lineNum = violations[i].line
-                guard lineNum >= 1, lineNum < lineOffsets.count else { continue }
-                let lineStart = lineOffsets[lineNum]
-                let lineEnd: Int
-                if lineNum + 1 < lineOffsets.count {
-                    lineEnd = lineOffsets[lineNum + 1] - 1
-                } else {
-                    lineEnd = text.utf8.count
-                }
-                if lineEnd > lineStart {
-                    violations[i].underlineRange = MarkdownHighlighter.utf8RangeToNSRange(
-                        start: lineStart, end: lineEnd, in: text
-                    )
-                }
-            }
+        // Compute underline ranges for each violation (full line)
+        for i in violations.indices {
+            violations[i].underlineRange = analysis.nsRange(forLine: violations[i].line)
+        }
 
-            return violations
-        }.value
+        return violations
     }
 
     /// Apply all fixable violations to the text. Returns the corrected string.
@@ -119,8 +103,9 @@ private extension MarkdownLinter {
 
     /// Detects lines like `#Heading` where there's no space after the `#` markers.
     /// This must be line-based because cmark-gfm doesn't parse `#Heading` as a heading.
-    static func checkAtxHeadingSpace(_ lines: [String], lineOffsets: [Int], source: String) -> [LintViolation] {
+    static func checkAtxHeadingSpace(_ lines: [String], analysis: MarkdownAnalysis) -> [LintViolation] {
         var violations: [LintViolation] = []
+        let lineOffsets = analysis.lineOffsets
         for (i, line) in lines.enumerated() {
             let lineNum = i + 1
             let trimmed = line.drop(while: \.isWhitespace)
@@ -129,21 +114,24 @@ private extension MarkdownLinter {
             let afterHashes = trimmed.dropFirst(hashCount)
             if afterHashes.isEmpty { continue }
             if afterHashes.first == " " { continue }
-            let utf8Offset = lineNum < lineOffsets.count ? lineOffsets[lineNum] + line.prefix(while: \.isWhitespace).utf8.count + hashCount : hashCount
+            let utf8Offset = lineNum < lineOffsets.count
+                ? lineOffsets[lineNum] + line.prefix(while: \.isWhitespace).utf8.count + hashCount
+                : hashCount
             violations.append(LintViolation(
                 rule: .atxHeadingSpace,
                 line: lineNum,
                 column: hashCount + 1,
                 message: "No space after '#' in heading",
-                fix: MarkdownHighlighter.utf8RangeToNSRange(start: utf8Offset, end: utf8Offset, in: source)
+                fix: analysis.nsInsertionRange(at: utf8Offset)
                     .map { LintFix(range: $0, replacement: " ") }
             ))
         }
         return violations
     }
 
-    static func checkTrailingWhitespace(_ lines: [String], lineOffsets: [Int], source: String) -> [LintViolation] {
+    static func checkTrailingWhitespace(_ lines: [String], analysis: MarkdownAnalysis) -> [LintViolation] {
         var violations: [LintViolation] = []
+        let lineOffsets = analysis.lineOffsets
         for (i, line) in lines.enumerated() {
             let lineNum = i + 1
             let trimmed = line.replacingOccurrences(of: "\\s+$", with: "", options: .regularExpression)
@@ -158,7 +146,7 @@ private extension MarkdownLinter {
                     line: lineNum,
                     column: trimmed.count + 1,
                     message: "Trailing whitespace",
-                    fix: MarkdownHighlighter.utf8RangeToNSRange(start: fixStart, end: fixEnd, in: source)
+                    fix: analysis.nsRange(utf8Start: fixStart, utf8End: fixEnd)
                         .map { LintFix(range: $0, replacement: "") }
                 ))
             }
@@ -166,8 +154,10 @@ private extension MarkdownLinter {
         return violations
     }
 
-    static func checkConsecutiveBlankLines(_ lines: [String], lineOffsets: [Int], source: String) -> [LintViolation] {
+    static func checkConsecutiveBlankLines(_ lines: [String], analysis: MarkdownAnalysis) -> [LintViolation] {
         var violations: [LintViolation] = []
+        let lineOffsets = analysis.lineOffsets
+        let source = analysis.source
         var blankRun = 0
         for (i, line) in lines.enumerated() {
             if line.allSatisfy(\.isWhitespace) {
@@ -186,7 +176,7 @@ private extension MarkdownLinter {
                             line: startLine,
                             column: 1,
                             message: "Multiple consecutive blank lines",
-                            fix: MarkdownHighlighter.utf8RangeToNSRange(start: keepEnd, end: fixEndOffset, in: source)
+                            fix: analysis.nsRange(utf8Start: keepEnd, utf8End: fixEndOffset)
                                 .map { LintFix(range: $0, replacement: "") }
                         ))
                     }
@@ -205,7 +195,7 @@ private extension MarkdownLinter {
                     line: startLine,
                     column: 1,
                     message: "Multiple consecutive blank lines",
-                    fix: MarkdownHighlighter.utf8RangeToNSRange(start: keepEnd, end: fileEnd, in: source)
+                    fix: analysis.nsRange(utf8Start: keepEnd, utf8End: fileEnd)
                         .map { LintFix(range: $0, replacement: "") }
                 ))
             }
@@ -217,40 +207,20 @@ private extension MarkdownLinter {
 // MARK: - AST walker
 
 struct LintWalker: MarkupWalker {
-    let source: String
+    let analysis: MarkdownAnalysis
     let lines: [String]
-    let lineOffsets: [Int]
     var violations: [LintViolation] = []
 
     private var lastHeadingLevel: Int = 0
     private var listMarkers: [(marker: Character, line: Int)] = []
 
-    init(source: String, lines: [String], lineOffsets: [Int]) {
-        self.source = source
+    init(analysis: MarkdownAnalysis, lines: [String]) {
+        self.analysis = analysis
         self.lines = lines
-        self.lineOffsets = lineOffsets
     }
 
-    private func nsRange(for markup: Markup) -> NSRange? {
-        guard let range = markup.range else { return nil }
-        let startLine = range.lowerBound.line
-        let startCol = range.lowerBound.column
-        let endLine = range.upperBound.line
-        let endCol = range.upperBound.column
-
-        guard startLine >= 1, startLine < lineOffsets.count,
-              endLine >= 1, endLine < lineOffsets.count else { return nil }
-
-        let start = lineOffsets[startLine] + (startCol - 1)
-        let end = lineOffsets[endLine] + (endCol - 1)
-
-        return MarkdownHighlighter.utf8RangeToNSRange(start: start, end: end, in: source)
-    }
-
-    /// Convert a UTF-8 offset to an NSRange insertion point (zero-length).
-    private func nsInsertionRange(at utf8Offset: Int) -> NSRange? {
-        return MarkdownHighlighter.utf8RangeToNSRange(start: utf8Offset, end: utf8Offset, in: source)
-    }
+    private var lineOffsets: [Int] { analysis.lineOffsets }
+    private var source: String { analysis.source }
 
     // MARK: Headings
 
@@ -276,7 +246,7 @@ struct LintWalker: MarkupWalker {
                 line: range.lowerBound.line,
                 column: trimmedEnd.count + 1,
                 message: "Trailing '#' characters on heading",
-                fix: MarkdownHighlighter.utf8RangeToNSRange(start: fixStart, end: fixEnd, in: source)
+                fix: analysis.nsRange(utf8Start: fixStart, utf8End: fixEnd)
                     .map { LintFix(range: $0, replacement: "") }
             ))
         }
@@ -292,7 +262,7 @@ struct LintWalker: MarkupWalker {
                     line: range.lowerBound.line,
                     column: 1,
                     message: "Heading should be preceded by a blank line",
-                    fix: nsInsertionRange(at: insertOffset)
+                    fix: analysis.nsInsertionRange(at: insertOffset)
                         .map { LintFix(range: $0, replacement: "\n") }
                 ))
             }
@@ -311,7 +281,7 @@ struct LintWalker: MarkupWalker {
                     line: range.lowerBound.line,
                     column: lines[lineIdx].count + 1,
                     message: "Heading should be followed by a blank line",
-                    fix: nsInsertionRange(at: headingLineEnd)
+                    fix: analysis.nsInsertionRange(at: headingLineEnd)
                         .map { LintFix(range: $0, replacement: "\n") }
                 ))
             }
@@ -378,7 +348,7 @@ struct LintWalker: MarkupWalker {
                     line: range.lowerBound.line,
                     column: 1,
                     message: "Code block should be preceded by a blank line",
-                    fix: nsInsertionRange(at: lineOffsets[range.lowerBound.line])
+                    fix: analysis.nsInsertionRange(at: lineOffsets[range.lowerBound.line])
                         .map { LintFix(range: $0, replacement: "\n") }
                 ))
             }
@@ -394,7 +364,7 @@ struct LintWalker: MarkupWalker {
                     line: range.upperBound.line,
                     column: range.upperBound.column,
                     message: "Code block should be followed by a blank line",
-                    fix: nsInsertionRange(at: insertUTF8)
+                    fix: analysis.nsInsertionRange(at: insertUTF8)
                         .map { LintFix(range: $0, replacement: "\n") }
                 ))
             }
@@ -419,7 +389,7 @@ struct LintWalker: MarkupWalker {
                     line: range.lowerBound.line,
                     column: 1,
                     message: "Block quote should be preceded by a blank line",
-                    fix: nsInsertionRange(at: lineOffsets[range.lowerBound.line])
+                    fix: analysis.nsInsertionRange(at: lineOffsets[range.lowerBound.line])
                         .map { LintFix(range: $0, replacement: "\n") }
                 ))
             }
@@ -435,7 +405,7 @@ struct LintWalker: MarkupWalker {
                     line: range.upperBound.line,
                     column: range.upperBound.column,
                     message: "Block quote should be followed by a blank line",
-                    fix: nsInsertionRange(at: insertUTF8)
+                    fix: analysis.nsInsertionRange(at: insertUTF8)
                         .map { LintFix(range: $0, replacement: "\n") }
                 ))
             }
@@ -484,7 +454,7 @@ struct LintWalker: MarkupWalker {
                 line: line,
                 column: rawLine.prefix(while: \.isWhitespace).count + 1,
                 message: "Expected list marker '-' but found '\(marker)'",
-                fix: MarkdownHighlighter.utf8RangeToNSRange(start: utf8Start, end: utf8End, in: source)
+                fix: analysis.nsRange(utf8Start: utf8Start, utf8End: utf8End)
                     .map { LintFix(range: $0, replacement: "-") }
             ))
         }

@@ -155,6 +155,18 @@ final class EditorTextControllerTests: XCTestCase {
         XCTAssertEqual(handledCount, 1)
     }
 
+    func testScrollToLineHandlesMultiByteTextCorrectly() async {
+        // "é" is 2 UTF-8 bytes but 1 UTF-16 code unit. Without UTF-16
+        // conversion, scrollToLine would treat the line-2 byte offset (3)
+        // as an NSRange location — landing past "b" instead of on it.
+        let controller = EditorTextController()
+        let text = "é\nb"
+
+        await controller.apply(makeState(text: text, pendingScrollToLine: 2)).value
+
+        XCTAssertEqual(textView(of: controller).selectedRange().location, 2)
+    }
+
     func testScrollToLineNilDoesNotFireHandler() async {
         let controller = EditorTextController()
         var handledCount = 0

@@ -209,10 +209,14 @@ final class EditorTextController: NSObject, NSTextViewDelegate {
 
     private func scrollToLine(_ lineNumber: Int) {
         let text = textView.string
-        let lineOffsets = MarkdownHighlighter.buildLineOffsets(text)
+        let lineOffsets = MarkdownAnalysis.lineOffsets(of: text)
         guard lineNumber >= 1, lineNumber < lineOffsets.count else { return }
-        let location = lineOffsets[lineNumber]
-        let range = NSRange(location: location, length: 0)
+        let utf8Offset = lineOffsets[lineNumber]
+        // Convert UTF-8 byte offset to UTF-16-based NSRange location;
+        // direct use would mis-position the cursor for multi-byte text.
+        guard let range = MarkdownAnalysis.nsRange(
+            utf8Start: utf8Offset, utf8End: utf8Offset, in: text
+        ) else { return }
         textView.setSelectedRange(range)
         textView.scrollRangeToVisible(range)
     }
