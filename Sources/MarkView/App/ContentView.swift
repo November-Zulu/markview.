@@ -4,6 +4,7 @@ import AppKit
 struct ContentView: View {
     @Bindable var workspace: WorkspaceState
     @Bindable var project: ProjectState
+    @State private var selection: SelectionCoordinator?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -28,16 +29,15 @@ struct ContentView: View {
         .task {
             NSApp.setActivationPolicy(.regular)
             NSApp.activate(ignoringOtherApps: true)
+            if selection == nil {
+                selection = SelectionCoordinator(project: project, workspace: workspace)
+            }
         }
         .onChange(of: project.selection) { _, newSelection in
-            guard let url = newSelection,
-                  !url.hasDirectoryPath else { return }
-            Task { await workspace.openFile(url) }
+            Task { await selection?.navigatorDidSelect(newSelection) }
         }
         .onChange(of: workspace.activeDocumentID) { _, newID in
-            if project.selection != newID {
-                project.selection = newID
-            }
+            selection?.tabDidActivate(newID)
         }
         .confirmationDialog(
             closeConfirmationTitle,
